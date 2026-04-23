@@ -1,0 +1,29 @@
+{
+  "initial_mode": "ame",
+  "base_model_paths":"models/qwen2.5",
+  "bi_encoder_paths":"models/all-MiniLM-L6-v2",
+  "cross_encoder_paths":"models/ms-marco-MiniLM-L-6-v2",
+  "chat_template":"qwen-2.5",
+  "mode_paths": {
+    "ame":"data/ame_setting.json",
+
+    "kangel": "data/kangel_setting.json"
+  },
+  "mem_len":6,
+  "rag_recall_size":5,
+  "rag_rerank_size": 2,
+  "inference_para":{
+    "ame":{
+            "max_new_tokens":128,
+            "temperature":0.6,
+            "top_p":0.6,
+            "repetition_penalty":1.1
+        },
+    "kangel":{
+            "max_new_tokens": 128,
+            "temperature": 0.6,
+            "top_p": 0.6,
+            "repetition_penalty": 1.1
+        }
+  }
+}

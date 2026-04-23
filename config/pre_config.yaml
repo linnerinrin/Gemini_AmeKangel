@@ -1,0 +1,13 @@
+bart_paths: models/qwen2.5
+max_seq_length: 2048
+chat_template: qwen-2.5
+inference_para:
+  compress:
+    max_new_tokens: 512
+    do_sample: False
+
+  rewrite:
+    max_new_tokens: 64
+    do_sample: False
+
+prompt:

@@ -1,0 +1,4 @@
+bi_encoder_paths: models/all-MiniLM-L6-v2
+cross_encoder_paths: models/ms-marco-MiniLM-L-6-v2
+rag_recall_size: 5
+rag_rerank_size: 2

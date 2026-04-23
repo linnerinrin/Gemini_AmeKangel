@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>Gemini Kangel_Ame</title>
+    <link rel="icon" type="image/png" href="../static/img.png">
+    <link rel="stylesheet" href="../static/x.css">
+</head>
+<body>
+    <div class="container">
+        <div class="mode-badge" id="modeBadge">糖糖</div>
+
+        <div class="toolbar">
+            <button class="theme-btn" onclick="showHistoryModal()">📜 查看历史</button>
+            <button class="theme-btn" onclick="showThemeModal()">🎨 切换主题</button>
+        </div>
+
+        <h2>✨ Gemini Ame/Kangel</h2>
+        <div>
+            <input type="text" id="inputText" placeholder="..." value="">
+            <button onclick="startStream()" id="sendBtn">发送</button>
+            <button onclick="cancelStream()" id="cancelBtn" style="background:#dc3545; display:none;">取消</button>
+        </div>
+        <div id="result"></div>
+    </div>
+
+    <!-- 历史记录侧边栏 -->
+    <div id="historySidebar" class="history-sidebar">
+        <div class="history-header">
+            <h3>📋 对话历史</h3>
+            <button class="close-history" onclick="closeHistorySidebar()">&times;</button>
+        </div>
+        <div id="historyContent" class="history-content">
+            <div class="history-placeholder">点击"查看历史"按钮加载记录</div>
+        </div>
+    </div>
+
+    <!-- 主题选择模态框 -->
+    <div id="themeModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                选择主题
+                <span class="close-modal" onclick="closeModal()">&times;</span>
+            </div>
+            <div class="theme-option kangel" onclick="selectTheme('kangel')">
+                🌸 超天酱
+            </div>
+            <div class="theme-option ame" onclick="selectTheme('ame')">
+                🖤 糖糖
+            </div>
+        </div>
+    </div>
+
+    <script src="../static/x.js"></script>
+</body>
+</html>

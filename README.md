@@ -58,90 +58,10 @@ project/
 ## 环境要求
 
 - Python 3.10+
-- CUDA 11.8+（推荐，支持4-bit量化推理）
-- 至少16GB显存（推荐） / 8GB显存（最低）
+- CUDA 11.8+
+- 8GB显存（推荐） / 6GB显存（最低）
 
-## 安装步骤
 
-### 1. 克隆项目
-
-```bash
-git clone <your-repo-url>
-cd <project-directory>
-```
-
-### 2. 安装依赖
-
-```bash
-pip install -r requirements.txt
-```
-
-主要依赖：`unsloth`, `torch`, `transformers`, `fastapi`, `uvicorn`, `langchain-community`, `sentence-transformers`, `faiss-gpu`, `pydantic`
-
-### 3. 下载模型
-
-```bash
-python scripts/download.py
-```
-
-该脚本会自动从 HuggingFace 镜像站下载以下模型：
-- Qwen2.5-3B-Instruct-bnb-4bit（基座模型）
-- all-MiniLM-L6-v2（向量召回）
-- ms-marco-MiniLM-L-6-v2（精排重排）
-- bert-base-chinese（压缩模型）
-
-### 4. 准备训练数据
-
-将对话语料放入 `data/` 目录：
-- `data/ame.txt`：糖糖角色语料（每行一个对话）
-- `data/kangel.txt`：超天酱角色语料
-
-转换为ShareGPT格式：
-
-```bash
-python scripts/load_train_data.py
-```
-
-### 5. 训练LoRA适配器
-
-```bash
-# 训练糖糖角色
-python scripts/train_ame.py
-
-# 训练超天酱角色
-python scripts/train_kangel.py
-```
-
-训练完成后，适配器将保存至 `models/lora_ame/` 和 `models/lora_kangel/`
-
-### 6. 准备知识库
-
-在 `data/` 目录下创建知识库文件：
-- `data/ame_knowledge.txt`：糖糖专属知识
-- `data/kangel_knowledge.txt`：超天酱专属知识
-
-每行一条知识条目。
-
-## 运行
-
-### Web服务模式
-
-```bash
-python APIService.py
-```
-
-访问 `http://127.0.0.1:8080`
-
-### 命令行交互模式
-
-```bash
-python LocalService.py
-```
-
-命令行命令：
-- `exit`：退出
-- `change`：切换角色
-- `history`：查看对话历史
 
 ## 配置说明
 
@@ -198,7 +118,7 @@ rag_rerank_size: 2          # 重排后保留数量
 
 ## API接口
 
-### `POST /api/post-demo`
+### `POST /api/post`
 
 发送消息并获取流式响应
 
@@ -225,7 +145,7 @@ rag_rerank_size: 2          # 重排后保留数量
 }
 ```
 
-### `POST /api/change-with-animation`
+### `POST /api/change`
 
 切换角色模式（带动画过渡）
 
@@ -288,7 +208,3 @@ rag_rerank_size: 2          # 重排后保留数量
 ### 更换基座模型
 
 修改 `model_config.yaml` 中的 `base_model_paths`，注意调整 `max_seq_length` 和 `chat_template`。
-
-## 许可证
-
-MIT License

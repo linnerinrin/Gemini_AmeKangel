@@ -87,8 +87,8 @@ def _():
 class PostData(BaseModel):
     content: str
 
-@app.post("/api/post-demo")
-async def post_demo(data: PostData):
+@app.post("/api/post")
+async def _(data: PostData):
     gemini_instance = get_gemini()
 
     return StreamingResponse(
@@ -110,7 +110,7 @@ async def get_history():
     return {"history": history}
 
 
-@app.post("/api/change-with-animation")
+@app.post("/api/change")
 async def change_mode_with_animation(data: PostData):
     """带流式动画的模式切换"""
     gemini_instance = get_gemini()

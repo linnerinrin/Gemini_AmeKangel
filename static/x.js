@@ -115,7 +115,7 @@ async function startStream() {
     abortController = new AbortController();
 
     try {
-        const response = await fetch("/api/post-demo", {
+        const response = await fetch("/api/post", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ content: text }),
@@ -290,7 +290,7 @@ async function selectTheme(theme) {
     sendBtn.disabled = true;
 
     try {
-        const response = await fetch("/api/change-with-animation", {
+        const response = await fetch("/api/change", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ content: theme })

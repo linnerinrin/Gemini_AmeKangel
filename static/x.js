@@ -1,6 +1,6 @@
 let abortController = null;
 let currentReader = null;
-let currentOutputDiv = null; // 保存当前输出区域的引用
+let currentOutputDiv = null;
 
 function getCurrentModeName() {
     const modeBadge = document.getElementById('modeBadge');

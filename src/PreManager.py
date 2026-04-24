@@ -1,3 +1,12 @@
+"""
+普通预处理类      --包含context comprss/query rewrite
+PreManager      --实现IPre 接口 包含 compress/rewrite/generate(IModel接口) 方法
+    init        --初始化模型/分词器/参数/模板
+    rewrite     --查询改写
+    compress        --上下文/文档压缩
+    generate        --生成并检查输出
+"""
+
 import asyncio
 from pathlib import Path
 from interfaces.IPre import IPre
@@ -14,14 +23,19 @@ class PreManager(IPre):
             load_in_4bit=True,
         )
         self.paras=config["inference_para"]
+
         self.tokenizer = get_chat_template(self.tokenizer, chat_template=config["chat_template"])
+
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
+
+    #查询改写
     async def rewrite(self,user_input,history):
         if not history:
             return user_input
 
+        #hitsory2str
         history_text = ""
         for msg in history:
             role = msg["role"]
@@ -38,6 +52,7 @@ class PreManager(IPre):
         return result if result else user_input
 
 
+    # 历史/文档压缩 输入history和rag文档 贴进prompt让模型压缩
     async def compress(self,history,docs):
         if not history:
             return ""
@@ -65,25 +80,36 @@ class PreManager(IPre):
         return result if result else ""
 
 
+    #生成 输入提示词 异步调用model.generate
     async def generate(self,prompt,paras) -> str:
         messages=[{"role":"user","content":prompt}]
+        #给当前提示词套模板 方便模型推理
         inputs = self.tokenizer.apply_chat_template(
             messages,
             tokenize=True,
             add_generation_prompt=True,
             return_tensors="pt"
         ).to("cuda")
+
+        #记录一下提示词长度 因为output会把提示词一起贴出来
         input_length = inputs.shape[1]
+
+        #打包参数
         generation_kwargs = dict(
             input_ids=inputs,
             **paras,
             pad_token_id=self.tokenizer.pad_token_id,
             eos_token_id=self.tokenizer.eos_token_id,
         )
+
+        #创建异步任务
         result=await asyncio.create_task(
             asyncio.to_thread(self.base_model.generate, **generation_kwargs)
         )
+
+        #解码输出
         response = self.tokenizer.decode(result[0][input_length:], skip_special_tokens=True)
+        #检查
         print(f"我是response:{response}")
         return response
 

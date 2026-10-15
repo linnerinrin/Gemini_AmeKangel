@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEEDY GIRL OVERDOSE - Windose 20</title>
+<link rel="stylesheet" href="css/desktop.css?v=20261022">
+</head>
+<body>
+
+<!-- Desktop -->
+<div id="desktop">
+
+  <!-- Side bars -->
+  <div class="side-bar" id="side-bar-left"></div>
+  <div class="side-bar" id="side-bar-right"></div>
+
+  <!-- Desktop icons -->
+  <div id="icon-grid">
+    <!-- YouTube: always visible -->
+    <div class="desktop-icon" id="icon-youtube" data-tooltip="YouTube">
+      <img src="assets/images/icon_desktop_youtube.png" alt="YouTube">
+      <span class="label" id="yt-label">直播</span>
+    </div>
+
+    <!-- Other icons: hidden until a save is selected -->
+    <div class="desktop-icon other hidden" id="icon-jine" data-tooltip="JINE">
+      <img src="assets/images/icon_desktop_jine2.png" alt="JINE">
+      <span class="label">JINE</span>
+    </div>
+    <div class="desktop-icon other hidden" data-tooltip="Poketter">
+      <img src="assets/images/icon_desktop_twitter.png" alt="Poketter">
+      <span class="label">推博</span>
+    </div>
+
+    <div class="desktop-icon other hidden" data-tooltip="Play">
+      <img src="assets/images/icon_desktop_asobu.png" alt="Play">
+      <span class="label">陪玩</span>
+    </div>
+    <div class="desktop-icon other hidden" data-tooltip="Go Out">
+      <img src="assets/images/icon_desktop_odekake.png" alt="Go Out">
+      <span class="label">外出</span>
+    </div>
+    <div class="desktop-icon other hidden" data-tooltip="Medicine">
+      <img src="assets/images/icon_desktop_okusuri.png" alt="Medicine">
+      <span class="label">吃药</span>
+    </div>
+    <div class="desktop-icon other hidden" data-tooltip="Sleep">
+      <img src="assets/images/icon_desktop_neru.png" alt="Sleep">
+      <span class="label">睡觉</span>
+    </div>
+    <div class="desktop-icon other hidden" id="icon-help" data-tooltip="帮助">
+      <img src="assets/images/icon_desktop_egosearch.png" alt="帮助">
+      <span class="label">帮助</span>
+    </div>
+  </div>
+
+              <!-- Stats window (uncloseable, hidden until save selection) -->
+    <div class="window hidden" id="stats-window">
+      <div class="window-header">
+        <img class="win-icon" src="assets/images/icon_status_love.png" alt="">
+        <span class="win-title">Task Manager</span>
+        <span class="win-close"></span>
+      </div>
+      <div class="window-body">
+        <!-- Followers row (no progress bar) -->
+        <div class="stats-row">
+          <img class="stats-icon" src="assets/images/task_manager_followers_icon.png" alt="">
+          <div class="stats-val-area stats-val-wide">
+            <span class="stats-label">粉丝</span>
+            <span class="stats-core" data-stat="followers">0</span>
+          </div>
+        </div>
+        <!-- Stress row -->
+        <div class="stats-row">
+          <img class="stats-icon" src="assets/images/task_manager_stress_icon.png" alt="">
+          <div class="stats-val-area">
+            <span class="stats-label">压力</span>
+            <span class="stats-numbers">
+              <span class="stats-core" data-stat="stress">0</span>
+              <span class="stats-sep">/</span>
+              <span class="stats-helper">100</span>
+            </span>
+          </div>
+          <div class="stats-bar-area">
+            <div class="stats-bar-bg">
+              <div class="stats-bar-fill" data-stat="stress" style="height:0%"></div>
+            </div>
+          </div>
+        </div>
+        <!-- Affection row -->
+        <div class="stats-row">
+          <img class="stats-icon" src="assets/images/task_manager_affection_icon.png" alt="">
+          <div class="stats-val-area">
+            <span class="stats-label">好感度</span>
+            <span class="stats-numbers">
+              <span class="stats-core" data-stat="affection">50</span>
+              <span class="stats-sep">/</span>
+              <span class="stats-helper">100</span>
+            </span>
+          </div>
+          <div class="stats-bar-area">
+            <div class="stats-bar-bg">
+              <div class="stats-bar-fill" data-stat="affection" style="height:50%"></div>
+            </div>
+          </div>
+        </div>
+        <!-- Mental Darkness row -->
+        <div class="stats-row">
+          <img class="stats-icon" src="assets/images/task_manager_mental_darkness_icon.png" alt="">
+          <div class="stats-val-area">
+            <span class="stats-label">阴暗度</span>
+            <span class="stats-numbers">
+              <span class="stats-core" data-stat="mental">0</span>
+              <span class="stats-sep">/</span>
+              <span class="stats-helper">100</span>
+            </span>
+          </div>
+          <div class="stats-bar-area">
+            <div class="stats-bar-bg">
+              <div class="stats-bar-fill" data-stat="mental" style="height:0%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="win-bot">
+        <div class="win-footer-left"></div>
+        <div class="win-footer-right"></div>
+      </div>
+    </div>
+
+  <!-- Ame window (uncloseable, hidden until save selection) -->
+  <div class="window hidden" id="ame-window">
+    <div class="window-header">
+      <img class="win-icon" src="assets/images/icon_jine_ame.png" alt="">
+      <span class="win-title">webcam</span>
+      <span class="win-close hidden"></span>
+    </div>
+    <div class="window-body ame-body">
+      <div class="ame-avatar-wrap">
+        <img class="ame-avatar-frame" id="ame-avatar-frame" src="assets/stream/ame/stream_ame_handspinner_000.png" alt="Ame">
+      </div>
+    </div>
+    <div class="win-bot">
+      <div class="win-footer-left"></div>
+      <div class="win-footer-right"></div>
+    </div>
+  </div>
+
+  <!-- Live stream window (hidden until save selection, toggleable via 直播 icon) -->
+<div class="window hidden" id="live-window">
+  <div class="window-header">
+    <img class="win-icon" src="assets/images/icon_live.png" alt="">
+    <span class="win-title">直播</span>
+    <span class="win-close"></span>
+  </div>
+  <div class="window-body live-body">
+    <img class="live-header-img" src="assets/images/live_header.png" alt="header">
+    <div class="live-main">
+      <!-- Left side -->
+      <div class="live-left">
+        <div class="live-stream-area">
+          <div class="live-stream-bg">
+            <img class="live-kangel-frame" id="live-kangel-frame" src="assets/stream/kangel/stream_cho_su_smile_000.png" alt="kangel">
+            <img class="live-kangel-frame hidden" id="live-dangel-frame" src="assets/stream/dangel/stream_cho_b_idle_000.png" alt="dangel">
+            <img class="live-kangel-frame hidden" id="live-ame-frame" src="assets/stream/ame/stream_ame_handspinner_000.png" alt="ame">
+          </div>
+          <div class="live-reply-overlay" id="live-reply-overlay"></div>
+        </div>
+        <div class="live-bottom">
+          <div class="live-msg" id="live-msg">
+            <span class="live-msg-title" id="live-msg-title">阿P专属直播</span>
+            <span class="live-msg-sub" id="live-msg-sub">1人正在观看，直播10天</span>
+          </div>
+          <div class="live-info-panel">
+            <div class="live-info-item">
+              <img class="stats-icon" src="assets/images/task_manager_followers_icon.png" alt="">
+              <div class="stats-val-area">
+                <span class="stats-label">粉丝</span>
+                <span class="stats-core" data-stat="followers">0</span>
+              </div>
+            </div>
+            <div class="live-info-item">
+              <img class="stats-icon" src="assets/images/task_manager_stress_icon.png" alt="">
+              <div class="stats-val-area">
+                <span class="stats-label">压力</span>
+                <span class="stats-numbers">
+                  <span class="stats-core" data-stat="stress">0</span>
+                  <span class="stats-sep">/</span>
+                  <span class="stats-helper">100</span>
+                </span>
+              </div>
+              <div class="stats-bar-area">
+                <div class="stats-bar-bg">
+                  <div class="stats-bar-fill" data-stat="stress" style="height:0%"></div>
+                </div>
+              </div>
+            </div>
+            <div class="live-info-item">
+              <img class="stats-icon" src="assets/images/task_manager_affection_icon.png" alt="">
+              <div class="stats-val-area">
+                <span class="stats-label">好感度</span>
+                <span class="stats-numbers">
+                  <span class="stats-core" data-stat="affection">50</span>
+                  <span class="stats-sep">/</span>
+                  <span class="stats-helper">100</span>
+                </span>
+              </div>
+              <div class="stats-bar-area">
+                <div class="stats-bar-bg">
+                  <div class="stats-bar-fill" data-stat="affection" style="height:50%"></div>
+                </div>
+              </div>
+            </div>
+            <div class="live-info-item">
+              <img class="stats-icon" src="assets/images/task_manager_mental_darkness_icon.png" alt="">
+              <div class="stats-val-area">
+                <span class="stats-label">阴暗度</span>
+                <span class="stats-numbers">
+                  <span class="stats-core" data-stat="mental">0</span>
+                  <span class="stats-sep">/</span>
+                  <span class="stats-helper">100</span>
+                </span>
+              </div>
+              <div class="stats-bar-area">
+                <div class="stats-bar-bg">
+                  <div class="stats-bar-fill" data-stat="mental" style="height:0%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Right side -->
+      <div class="live-right">
+        <div class="live-right-top">
+          <div class="live-danmaku" id="live-danmaku"></div>
+          <div class="live-input-wrap">
+            <div class="live-emoji-popup hidden" id="live-emoji-popup">
+              <div class="jine-emoji-row live-emoji-row">
+                <img class="jine-emoji-btn" src="assets/emoji/jine_pien_compromise.gif" data-emoji="jine_pien_compromise">
+                <img class="jine-emoji-btn" src="assets/emoji/jine_pien_die.gif" data-emoji="jine_pien_die">
+                <img class="jine-emoji-btn" src="assets/emoji/jine_pien_loveforever.gif" data-emoji="jine_pien_loveforever">
+                <img class="jine-emoji-btn" src="assets/emoji/jine_pien_nyan.gif" data-emoji="jine_pien_nyan">
+                <img class="jine-emoji-btn" src="assets/emoji/jine_pien_ok.gif" data-emoji="jine_pien_ok">
+                <img class="jine-emoji-btn" src="assets/emoji/jine_pien_praise.gif" data-emoji="jine_pien_praise">
+                <img class="jine-emoji-btn" src="assets/emoji/jine_pien_sorry.gif" data-emoji="jine_pien_sorry">
+                <img class="jine-emoji-btn" src="assets/emoji/jine_pien_uncare.gif" data-emoji="jine_pien_uncare">
+              </div>
+            </div>
+            <img class="live-user-avatar" src="assets/images/icon_bear.png" alt="">
+            <div class="live-user-info">
+              <span class="live-username">P-chan</span>
+              <span class="live-user-email">p-chan@needy.moe</span>
+            </div>
+            <img class="live-input-div-bg" src="assets/images/live_input_div.png" alt="">
+            <div class="live-input-overlay">
+              <div class="live-input-inner">
+                <input type="text" class="jine-input" id="live-chat-input" placeholder="发送弹幕..." maxlength="60">
+                <button class="live-emoji-toggle" id="live-emoji-toggle"><img src="assets/images/icon_emoji_79.png" alt="😊"></button>
+                <button class="jine-send-btn" id="live-send-btn">发送</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="win-bot">
+    <div class="win-footer-left"></div>
+    <div class="win-footer-right"></div>
+  </div>
+</div>
+
+<!-- JINE chat window (hidden until save selection, toggleable via JINE icon) -->
+  <div class="window hidden" id="jine-window">
+    <div class="window-header">
+      <img class="win-icon" src="assets/images/icon_jine_ame.png" alt="">
+      <span class="win-title">JINE</span>
+      <span class="win-close"></span>
+    </div>
+    <div class="window-body jine-body">
+      <div class="jine-chat-wrap">
+        <div class="jine-chat-area" id="jine-chat-area">
+        <div class="jine-date-bar">
+          <img src="assets/images/JINE_date.png" alt="date">
+          <span class="jine-date-text"></span>
+        </div>
+        <div class="jine-msg jine-msg-ame">
+          <img class="jine-bubble-icon" src="assets/images/icon_jine_ame.png" alt="">
+          <div class="jine-bubble">
+            <span>早安，阿p</span>
+          </div>
+        </div>
+        <div class="jine-msg jine-msg-user">
+          <img class="jine-bear-icon" src="assets/images/icon_bear.png" alt="">
+          <div class="jine-bubble">
+            <span>早安</span>
+          </div>
+        </div>
+        <div class="jine-msg jine-msg-ame">
+          <img class="jine-bubble-icon" src="assets/images/icon_jine_ame.png" alt="">
+          <div class="jine-bubble">
+            <span>今天的直播，会来看吗？</span>
+          </div>
+        </div>
+        <div class="jine-msg jine-msg-user">
+          <img class="jine-bear-icon" src="assets/images/icon_bear.png" alt="">
+          <div class="jine-bubble">
+            <span>当然</span>
+          </div>
+        </div>
+        <div class="jine-msg jine-msg-ame">
+          <img class="jine-bubble-icon" src="assets/images/icon_jine_ame.png" alt="">
+          <div class="jine-bubble">
+            <span>太好了！那晚上见，阿p</span>
+          </div>
+        </div>
+      </div>
+        <img class="jine-scroll-btn" id="jine-scroll-btn" src="assets/images/JINE_button_tobottom.png" title="Scroll to bottom">
+      </div>
+      <div class="jine-input-row">
+        <div class="jine-emoji-popup hidden" id="jine-emoji-popup">
+          <div class="jine-emoji-row">
+            <img class="jine-emoji-btn" src="assets/emoji/jine_pien_compromise.gif" data-emoji="jine_pien_compromise" title="compromise">
+            <img class="jine-emoji-btn" src="assets/emoji/jine_pien_die.gif" data-emoji="jine_pien_die" title="die">
+            <img class="jine-emoji-btn" src="assets/emoji/jine_pien_loveforever.gif" data-emoji="jine_pien_loveforever" title="loveforever">
+            <img class="jine-emoji-btn" src="assets/emoji/jine_pien_nyan.gif" data-emoji="jine_pien_nyan" title="nyan">
+            <img class="jine-emoji-btn" src="assets/emoji/jine_pien_ok.gif" data-emoji="jine_pien_ok" title="ok">
+            <img class="jine-emoji-btn" src="assets/emoji/jine_pien_praise.gif" data-emoji="jine_pien_praise" title="praise">
+            <img class="jine-emoji-btn" src="assets/emoji/jine_pien_sorry.gif" data-emoji="jine_pien_sorry" title="sorry">
+            <img class="jine-emoji-btn" src="assets/emoji/jine_pien_uncare.gif" data-emoji="jine_pien_uncare" title="uncare">
+          </div>
+        </div>
+        <div class="jine-input-wrap">
+          <input type="text" class="jine-input" id="jine-input" placeholder="输入消息..." maxlength="120">
+          <button class="jine-emoji-toggle" id="jine-emoji-toggle"><img src="assets/images/icon_emoji_79.png" alt="😊"></button>
+          <button class="jine-send-btn" id="jine-send-btn">Send</button>
+        </div>
+      </div>
+    </div>
+    <div class="win-bot">
+      <div class="win-footer-left"></div>
+      <div class="win-footer-right"></div>
+    </div>
+  </div>
+
+  <!-- 帮助 window -->
+  <div class="window hidden" id="help-window">
+    <div class="window-header">
+      <img class="win-icon" src="assets/images/icon_desktop_egosearch.png" alt="">
+      <span class="win-title">帮助</span>
+      <span class="win-close"></span>
+    </div>
+    <div class="window-body help-body">
+      <div class="text-scroll-area" id="help-text-area"></div>
+    </div>
+    <div class="win-bot">
+      <div class="win-footer-left"></div>
+      <div class="win-footer-right"></div>
+    </div>
+  </div>
+
+  <!-- Topic selection window -->
+  <div class="window hidden" id="topic-window">
+    <div class="window-header">
+      <img class="win-icon" src="assets/images/icon_live.png" alt="">
+      <span class="win-title">选择直播主题</span>
+      <span class="win-close"></span>
+    </div>
+    <div class="window-body topic-body">
+      <div id="topic-grid">
+        <div class="topic-cell-wrap"><div class="topic-cell" data-topic="0"><span class="topic-cell-title">Title</span><span class="topic-cell-sub">Sub</span></div></div>
+        <div class="topic-cell-wrap"><div class="topic-cell" data-topic="1"><span class="topic-cell-title">Title</span><span class="topic-cell-sub">Sub</span></div></div>
+        <div class="topic-cell-wrap"><div class="topic-cell" data-topic="2"><span class="topic-cell-title">Title</span><span class="topic-cell-sub">Sub</span></div></div>
+        <div class="topic-cell-wrap"><div class="topic-cell" data-topic="3"><span class="topic-cell-title">Title</span><span class="topic-cell-sub">Sub</span></div></div>
+        <div class="topic-cell-wrap"><div class="topic-cell" data-topic="4"><span class="topic-cell-title">Title</span><span class="topic-cell-sub">Sub</span></div></div>
+        <div class="topic-cell-wrap"><div class="topic-cell" data-topic="5"><span class="topic-cell-title">Title</span><span class="topic-cell-sub">Sub</span></div></div>
+        <div class="topic-cell-wrap"><div class="topic-cell" data-topic="6"><span class="topic-cell-title">Title</span><span class="topic-cell-sub">Sub</span></div></div>
+        <div class="topic-cell-wrap"><div class="topic-cell" data-topic="7"><span class="topic-cell-title">Title</span><span class="topic-cell-sub">Sub</span></div></div>
+        <div class="topic-cell-wrap"><div class="topic-cell" data-topic="8"><span class="topic-cell-title">Title</span><span class="topic-cell-sub">Sub</span></div></div>
+        <div class="topic-cell-wrap"><div class="topic-cell" data-topic="9"><span class="topic-cell-title">Title</span><span class="topic-cell-sub">Sub</span></div></div>
+        <div class="topic-cell-wrap"><div class="topic-cell" data-topic="10"><span class="topic-cell-title">Title</span><span class="topic-cell-sub">Sub</span></div></div>
+        <div class="topic-cell-wrap"><div class="topic-cell" data-topic="11"><span class="topic-cell-title">Title</span><span class="topic-cell-sub">Sub</span></div></div>
+      </div>
+    </div>
+    <div class="win-bot">
+      <div class="win-footer-left"></div>
+      <div class="win-footer-right"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Taskbar -->
+<div id="taskbar">
+  <img id="start-btn" src="assets/images/button_start.png" alt="START">
+  <div id="taskbar-items">
+    <img class="taskbar-item" id="taskbar-jine" src="assets/images/icon_taskbar_jine.png" alt="JINE">
+    <img class="taskbar-item" src="assets/images/icon_taskbar_poketter.png" alt="Poketter">
+    <img class="taskbar-item" id="taskbar-taskmgr" src="assets/images/icon_taskbar_taskmanager.png" alt="TaskMgr">
+  </div>
+  <div id="taskbar-right">
+    <img id="psyche-btn" src="assets/images/icon_window_psyche.png" alt="BGM">
+    <span id="taskbar-bgm-name"></span>
+    <span id="taskbar-clock">
+      <img id="clock-icon" src="assets/images/icon_watch_noon.png" alt="">
+      <span id="clock-text">00:00</span>
+    </span>
+  </div>
+</div>
+
+<!-- Start Menu -->
+<div id="start-menu">
+  <img src="assets/images/start_menu.png" alt="Start Menu">
+  <div id="start-menu-buttons">
+    <div class="start-menu-btn-wrap" id="sm-control">
+      <div class="start-menu-btn"></div>
+      <span class="start-menu-btn-text">控制面板</span>
+    </div>
+    <div class="start-menu-btn-wrap" id="sm-save">
+      <div class="start-menu-btn"></div>
+      <span class="start-menu-btn-text">选择存档</span>
+    </div>
+    <div class="start-menu-btn-wrap" id="sm-logout">
+      <div class="start-menu-btn"></div>
+      <span class="start-menu-btn-text">返回存档选择</span>
+    </div>
+  </div>
+</div>
+
+<!-- Psyche menu (BGM list) -->
+<div id="psyche-menu">
+  <img src="assets/images/start_menu.png" alt="BGM Menu">
+  <div id="psyche-menu-top">
+    <span id="psyche-now-playing"></span>
+    <div id="psyche-controls-row">
+      <img id="psyche-capsule-btn" src="assets/images/icon_window_hiporon_capsule1.png" alt="BGM">
+      <div id="psyche-progress-wrap">
+        <div class="psyche-bar-bg">
+          <div class="psyche-bar-fill" id="psyche-bar-fill"></div>
+        </div>
+        <span id="psyche-time">0:00 / 0:00</span>
+      </div>
+    </div>
+  </div>
+  <div id="psyche-menu-scroll">
+    <div class="psyche-btn-wrap" data-bgm="mainloop_normal" data-sub="与糖糖的轻松日常"><div class="start-menu-btn"></div><span class="start-menu-btn-text">mainloop_normal</span></div>
+    <div class="psyche-btn-wrap" data-bgm="mainloop_middle" data-sub="糖糖的斗争陷入白热化"><div class="start-menu-btn"></div><span class="start-menu-btn-text">mainloop_middle</span></div>
+    <div class="psyche-btn-wrap" data-bgm="mainloop_yami" data-sub="与糖糖的轻松日常……吗？"><div class="start-menu-btn"></div><span class="start-menu-btn-text">mainloop_yami</span></div>
+    <div class="psyche-btn-wrap" data-bgm="mainloop_gedarranged" data-sub="糖糖似乎有点危险"><div class="start-menu-btn"></div><span class="start-menu-btn-text">mainloop_gedarranged</span></div>
+    <div class="psyche-btn-wrap" data-bgm="mainloop_emoarranged" data-sub="天使也是会流泪的"><div class="start-menu-btn"></div><span class="start-menu-btn-text">mainloop_emoarranged</span></div>
+    <div class="psyche-btn-wrap" data-bgm="mainloop_normaledarranged" data-sub="千万数据的大冲击"><div class="start-menu-btn"></div><span class="start-menu-btn-text">mainloop_normaledarranged</span></div>
+    <div class="psyche-btn-wrap" data-bgm="mainloop_happyarranged" data-sub="世界虽苦，有你皆甜"><div class="start-menu-btn"></div><span class="start-menu-btn-text">mainloop_happyarranged</span></div>
+    <div class="psyche-btn-wrap" data-bgm="mainloop_shuban" data-sub="好像有不好的事情要发生"><div class="start-menu-btn"></div><span class="start-menu-btn-text">mainloop_shuban</span></div>
+    <div class="psyche-btn-wrap" data-bgm="event_yami" data-sub="因为，最痛的不是手腕"><div class="start-menu-btn"></div><span class="start-menu-btn-text">event_yami</span></div>
+    <div class="psyche-btn-wrap" data-bgm="event_happy" data-sub="普通的生活对她而言是完美的吗"><div class="start-menu-btn"></div><span class="start-menu-btn-text">event_happy</span></div>
+    <div class="psyche-btn-wrap" data-bgm="event_emo" data-sub="我爱你爱你爱你爱你爱你一千遍"><div class="start-menu-btn"></div><span class="start-menu-btn-text">event_emo</span></div>
+    <div class="psyche-btn-wrap" data-bgm="ending_grand" data-sub="刚才谁给你发微信？"><div class="start-menu-btn"></div><span class="start-menu-btn-text">ending_grand</span></div>
+    <div class="psyche-btn-wrap" data-bgm="ending_dead" data-sub="天使的坠落"><div class="start-menu-btn"></div><span class="start-menu-btn-text">ending_dead</span></div>
+    <div class="psyche-btn-wrap" data-bgm="ending_ginga" data-sub="应许之地便是那永远的乌托邦"><div class="start-menu-btn"></div><span class="start-menu-btn-text">ending_ginga</span></div>
+    <div class="psyche-btn-wrap" data-bgm="ending_ideon" data-sub="至少曾经努力过，不是吗"><div class="start-menu-btn"></div><span class="start-menu-btn-text">ending_ideon</span></div>
+    <div class="psyche-btn-wrap" data-bgm="InternetOverdose" data-sub="点赞，点踩，对你来说是致命毒药&#10;点赞，点踩，可你还是会一饮而尽"><div class="start-menu-btn"></div><span class="start-menu-btn-text">INTERNET OVERDOSE</span></div>
+    <div class="psyche-btn-wrap" data-bgm="internetoverdose_offvocal" data-sub="点赞，点踩，对你来说是致命毒药&#10;点赞，点踩，可你还是会一饮而尽"><div class="start-menu-btn"></div><span class="start-menu-btn-text">INTERNET OVERDOSE_offvocal</span></div>
+    <div class="psyche-btn-wrap" data-bgm="INTERNET OVERDOSE8bit" data-sub="点赞，点踩，对你来说是致命毒药&#10;点赞，点踩，可你还是会一饮而尽"><div class="start-menu-btn"></div><span class="start-menu-btn-text">INTERNET OVERDOSE_8bit</span></div>
+    <div class="psyche-btn-wrap" data-bgm="INTERNET YAMERO" data-sub="这垃圾互联网待不下去了，我们一起逃走去看海吧"><div class="start-menu-btn"></div><span class="start-menu-btn-text">INTERNET YAMERO</span></div>
+    <div class="psyche-btn-wrap" data-bgm="INTERNET YAMERO_offvocal" data-sub="这垃圾互联网待不下去了，我们一起逃走去看海吧"><div class="start-menu-btn"></div><span class="start-menu-btn-text">INTERNET YAMERO_offvocal</span></div>
+    <div class="psyche-btn-wrap" data-bgm="03 月虹蝶" data-sub="「月神一直守护着愚不可及的二人」"><div class="start-menu-btn"></div><span class="start-menu-btn-text">月虹蝶</span></div>
+    <div class="psyche-btn-wrap" data-bgm="04 月虹蝶(inst)" data-sub="「月神一直守护着愚不可及的二人」"><div class="start-menu-btn"></div><span class="start-menu-btn-text">月虹蝶_offvocal</span></div>
+    <div class="psyche-btn-wrap" data-bgm="きゅびずむ" data-sub="裁剪又贴上的皮，看见开裂的疤"><div class="start-menu-btn"></div><span class="start-menu-btn-text">きゅびずむ</span></div>
+    <div class="psyche-btn-wrap" data-bgm="きゅびずむ_offvocal" data-sub="裁剪又贴上的皮，看见开裂的疤"><div class="start-menu-btn"></div><span class="start-menu-btn-text">きゅびずむ_offvocal</span></div>
+    <div class="psyche-btn-wrap" data-bgm="きゅびびびびずむ" data-sub="老人正在一边看着你"><div class="start-menu-btn"></div><span class="start-menu-btn-text">きゅびびびびずむ</span></div>
+    <div class="psyche-btn-wrap" data-bgm="きゅびびびびずむ_offvocal" data-sub="老人正在一边看着你"><div class="start-menu-btn"></div><span class="start-menu-btn-text">きゅびびびびずむ_offvocal</span></div>
+  </div>
+</div>
+
+<!-- Save select window -->
+  <div class="window hidden" id="save-window">
+    <div class="window-header">
+      <img class="win-icon" src="assets/images/icon_jine_ame.png" alt="">
+      <span class="win-title">选择存档</span>
+      <span class="win-close" id="save-win-close"></span>
+    </div>
+    <div class="window-body save-body">
+      <div id="save-grid">
+        <div class="save-slot unregistered" data-slot="1">
+          <div class="save-slot-main">
+            <img class="save-slot-avatar" src="assets/images/icon_ame.png" alt="存档1">
+            <span class="save-slot-label">存档 1</span>
+          </div>
+          <img class="save-slot-trash hidden" src="assets/images/icon_trash_can.png" alt="删除">
+        </div>
+        <div class="save-slot unregistered" data-slot="2">
+          <div class="save-slot-main">
+            <img class="save-slot-avatar" src="assets/images/icon_ame.png" alt="存档2">
+            <span class="save-slot-label">存档 2</span>
+          </div>
+          <img class="save-slot-trash hidden" src="assets/images/icon_trash_can.png" alt="删除">
+        </div>
+        <div class="save-slot unregistered" data-slot="3">
+          <div class="save-slot-main">
+            <img class="save-slot-avatar" src="assets/images/icon_ame.png" alt="存档3">
+            <span class="save-slot-label">存档 3</span>
+          </div>
+          <img class="save-slot-trash hidden" src="assets/images/icon_trash_can.png" alt="删除">
+        </div>
+      </div>
+    </div>
+    <div class="win-bot">
+      <div class="win-footer-left"></div>
+      <div class="win-footer-right"></div>
+    </div>
+  </div>
+
+  <!-- Delete save confirm window -->
+  <div class="window hidden" id="delete-save-window">
+    <div class="window-header">
+      <img class="win-icon" src="assets/images/icon_jine_ame.png" alt="">
+      <span class="win-title">删除存档</span>
+      <span class="win-close"></span>
+    </div>
+    <div class="window-body delete-body">
+      <span class="delete-text" id="delete-save-label">确定删除存档 1 吗？</span>
+      <div class="delete-btns">
+        <div class="login-link-wrap" id="delete-cancel">
+          <div class="login-link-btn"></div>
+          <span class="login-link-text">取消</span>
+        </div>
+        <div class="login-link-wrap" id="delete-confirm">
+          <div class="login-link-btn"></div>
+          <span class="login-link-text">确认删除</span>
+        </div>
+      </div>
+    </div>
+    <div class="win-bot">
+      <div class="win-footer-left"></div>
+      <div class="win-footer-right"></div>
+    </div>
+  </div>
+
+  <!-- Return to save selection window -->
+  <div class="window hidden" id="logout-window">
+    <div class="window-header">
+      <img class="win-icon" src="assets/images/icon_jine_ame.png" alt="">
+      <span class="win-title">返回存档选择</span>
+      <span class="win-close"></span>
+    </div>
+    <div class="window-body logout-body">
+      <span class="logout-text">返回存档选择？</span>
+      <div class="logout-btns">
+        <div class="login-link-wrap" id="logout-cancel">
+          <div class="login-link-btn"></div>
+          <span class="login-link-text">取消</span>
+        </div>
+        <div class="login-link-wrap" id="logout-confirm">
+          <div class="login-link-btn"></div>
+          <span class="login-link-text">确认</span>
+        </div>
+      </div>
+    </div>
+    <div class="win-bot">
+      <div class="win-footer-left"></div>
+      <div class="win-footer-right"></div>
+    </div>
+  </div>
+
+<!-- Hover tooltip (topic cells & BGM) -->
+<div id="hover-tooltip" class="hidden">
+  <img src="assets/images/tuuti.png" alt="">
+  <div id="hover-tooltip-content">
+    <span id="hover-tooltip-title"></span>
+    <span id="hover-tooltip-sub"></span>
+  </div>
+</div>
+<!-- Error toast -->
+<div id="error-toast" class="hidden">
+  <span id="error-toast-text"></span>
+</div>
+
+<!-- Control panel window -->
+<div class="window hidden" id="control-window">
+  <div class="window-header">
+    <img class="win-icon" src="assets/images/icon_jine_ame.png" alt="">
+    <span class="win-title">控制面板</span>
+    <span class="win-close"></span>
+  </div>
+  <div class="window-body control-body">
+    <div class="control-section">
+      <span class="control-label">BGM 音量</span>
+      <div class="control-slider-wrap">
+        <input type="range" class="control-slider" id="bgm-volume-slider" min="0" max="100" value="50">
+        <span class="control-val" id="bgm-volume-val">50</span>
+      </div>
+    </div>
+    <div class="control-section">
+      <span class="control-label">音效音量</span>
+      <div class="control-slider-wrap">
+        <input type="range" class="control-slider" id="sfx-volume-slider" min="0" max="100" value="80">
+        <span class="control-val" id="sfx-volume-val">80</span>
+      </div>
+    </div>
+    <div class="control-section">
+      <span class="control-label">自动播放 BGM</span>
+      <label class="control-toggle">
+        <input type="checkbox" id="bgm-autoplay" checked>
+        <span class="control-toggle-slider"></span>
+      </label>
+    </div>
+
+    <!-- ── P5a：对话模式（任务轴，写 NGO.taskMode，localStorage 记住）── -->
+    <div class="control-section control-section-column">
+      <span class="control-label">对话模式</span>
+      <div class="control-radio-row">
+        <label class="control-radio">
+          <input type="radio" name="task-mode" id="task-mode-chat" value="chat" checked>
+          <span>聊天</span>
+        </label>
+        <label class="control-radio">
+          <input type="radio" name="task-mode" id="task-mode-work" value="work">
+          <span>工作</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- ── P5a：模型设置（OpenAI 兼容厂商）── -->
+    <div class="control-section control-section-column">
+      <span class="control-label">模型厂商</span>
+      <select class="control-input control-select" id="llm-provider">
+        <option value="deepseek">DeepSeek</option>
+        <option value="openai">OpenAI</option>
+        <option value="custom">自定义（OpenAI 兼容）</option>
+      </select>
+    </div>
+    <div class="control-section control-section-column">
+      <span class="control-label">模型版本</span>
+      <input type="text" class="control-input" id="llm-model" placeholder="deepseek-v4-flash" autocomplete="off">
+    </div>
+    <div class="control-section control-section-column">
+      <span class="control-label">API Key</span>
+      <input type="password" class="control-input" id="llm-api-key" placeholder="留空则沿用已保存的 Key" autocomplete="new-password">
+    </div>
+    <div class="control-section control-section-column">
+      <span class="control-label">接口地址 base_url</span>
+      <input type="text" class="control-input" id="llm-base-url" placeholder="https://api.deepseek.com" autocomplete="off">
+    </div>
+    <div class="control-btn-row">
+      <button type="button" class="control-btn" id="llm-save-btn">保存</button>
+      <button type="button" class="control-btn" id="llm-test-btn">测试</button>
+    </div>
+    <div class="control-status" id="llm-status"></div>
+  </div>
+  <div class="win-bot">
+    <div class="win-footer-left"></div>
+    <div class="win-footer-right"></div>
+  </div>
+</div>
+
+<!-- Tooltip -->
+<div id="tooltip"></div>
+
+<!-- ═══ data: static data + configs + API wrappers (no deps on service/ui) ═══ -->
+<script src="js/data/role-mapping.js?v=2"></script>
+<script src="js/data/topics.js?v=7"></script>
+<script src="js/data/frames-live.js?v=6"></script>
+<script src="js/data/frames-jine.js?v=5"></script>
+<script src="js/data/registry.js?v=20261025"></script>
+<script src="js/data/api/core.js?v=6"></script>
+<script src="js/data/api/chat.js?v=20261101"></script>
+<script src="js/data/api/save.js?v=5"></script>
+<script src="js/data/api/mode.js?v=5"></script>
+<script src="js/data/api/status.js?v=5"></script>
+<script src="js/data/api/settings.js?v=20261101"></script>
+<script src="js/data/test-mock.js?v=5"></script>
+
+<!-- ═══ service: business logic (no DOM) ═══ -->
+<script src="js/service/time.js?v=5"></script>
+<script src="js/service/audio.js?v=5"></script>
+<script src="js/service/bgm.js?v=20261014"></script>
+<script src="js/service/stats.js?v=6"></script>
+<script src="js/service/status-delta.js?v=2"></script>
+<script src="js/service/animation.js?v=20261020"></script>
+<script src="js/service/chat.js?v=20261105"></script>
+<script src="js/service/save.js?v=20261015"></script>
+<script src="js/service/desktop-session.js?v=20261015"></script>
+<script src="js/service/text.js?v=20261015"></script>
+<script src="js/service/thinking.js?v=20261019"></script>
+<script src="js/service/window.js?v=5"></script>
+
+<!-- ═══ ui: global state + chrome ═══ -->
+<script src="js/ui/toast.js?v=5"></script>
+<script src="js/ui/desktop.js?v=20261015"></script>
+
+<!-- ═══ ui: windows (each = one window's logic + WindowManager.register) ═══ -->
+<script src="js/ui/ame.js?v=5"></script>
+<script src="js/ui/stats.js?v=5"></script>
+<script src="js/ui/jine.js?v=7"></script>
+<script src="js/ui/live.js?v=20261015"></script>
+<script src="js/ui/topic.js?v=5"></script>
+<script src="js/ui/control.js?v=20261102"></script>
+<script src="js/ui/save.js?v=7"></script>
+<script src="js/ui/logout.js?v=5"></script>
+
+<!-- ═══ ui: menus ═══ -->
+<script src="js/ui/bgm-menu.js?v=20261014"></script>
+
+</body>
+</html>

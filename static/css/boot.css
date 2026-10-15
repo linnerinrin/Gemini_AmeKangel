@@ -1,0 +1,209 @@
+@font-face {
+  font-family: 'DOS';
+  src: url('../assets/fonts/PerfectDOSVGA437.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'Pixel';
+  src: url('../assets/fonts/PixelMplus10-Regular.ttf') format('truetype');
+}
+@font-face {
+  font-family: 'ZPix';
+  src: url('../assets/fonts/zpix.ttf') format('truetype');
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  cursor: none;
+}
+
+#boot-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #000;
+  overflow: hidden;
+  z-index: 1;
+}
+
+/* ── CRT effects ── */
+
+.scanlines {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.15) 2px,
+    rgba(0, 0, 0, 0.15) 4px
+  );
+  pointer-events: none;
+  z-index: 100;
+}
+
+.crt-flicker {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(255, 255, 255, 0.02);
+  animation: flicker 0.15s infinite;
+  pointer-events: none;
+  z-index: 101;
+}
+
+@keyframes flicker {
+  0%   { opacity: 0.05; }
+  50%  { opacity: 0.02; }
+  100% { opacity: 0.05; }
+}
+
+/* ── BIOS Layer ── */
+
+#bios-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  padding: 3vh 3vw;
+}
+
+.bios-line {
+  color: #aaa;
+  font-family: 'DOS', monospace;
+  font-size: clamp(12px, 1.8vh, 22px);
+  line-height: 1.8;
+  opacity: 0;
+  white-space: pre;
+}
+
+.bios-line.visible { opacity: 1; }
+.bios-line.dim     { opacity: 0.4; color: #666; }
+.bios-line.bright  { color: #fff; }
+
+#bios-logo-area {
+  margin: 2vh 0 1vh 0;
+  opacity: 0;
+  transition: opacity 2s;
+}
+
+#bios-logo-area.show { opacity: 1; }
+
+#bios-logo-area img {
+  image-rendering: pixelated;
+  height: clamp(25px, 5vh, 60px);
+}
+
+/* ── Logo Layer ── */
+
+#logo-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 2s;
+  background: #000;
+}
+
+#logo-layer.show { opacity: 1; }
+
+#logo-img {
+  image-rendering: pixelated;
+  width: 100vw;
+  height: 100vh;
+  object-fit: contain;
+}
+
+#logo-warning {
+  color: #e04040;
+  font-family: 'DOS', monospace;
+  font-size: clamp(9px, 1.4vh, 16px);
+  letter-spacing: 0.15em;
+  animation: blink-warn 0.8s step-end infinite;
+  text-align: center;
+  padding: 0 5vw;
+}
+
+@keyframes blink-warn {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+
+#logo-subtitle {
+  position: absolute;
+  bottom: 8vh;
+  color: #fff;
+  font-family: 'ZPix', 'Pixel', monospace;
+  font-size: clamp(14px, 2vh, 22px);
+  letter-spacing: 0.3em;
+  animation: blink-warn 1.2s step-end infinite;
+  text-shadow: 0 0 10px rgba(255,255,255,0.5);
+}
+
+/* ── Transition overlay ── */
+
+#transition-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 200;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 1.5s;
+}
+
+#transition-overlay.active { opacity: 1; }
+
+/* ── Click hint ── */
+
+#skip-hint {
+  position: fixed;
+  bottom: 5vh;
+  right: 5vw;
+  color: #555;
+  font-family: 'Pixel', monospace;
+  font-size: clamp(9px, 1.2vh, 14px);
+  z-index: 150;
+  opacity: 0;
+  transition: opacity 1s;
+  cursor: pointer;
+  letter-spacing: 0.2em;
+}
+
+#skip-hint.show { opacity: 1; }
+
+/* ── Responsive tweaks ── */
+
+@media (min-width: 1200px) {
+  .bios-line { line-height: 2; }
+}
+
+@media (max-width: 600px) {
+  .bios-line { line-height: 1.5; }
+  #bios-layer { padding: 2vh 4vw; }
+}

@@ -1,0 +1,124 @@
+{
+  "/chat/single_chat": {
+    "methods": [
+      {
+        "method": "POST",
+        "auth": false,
+        "request": {"prompt": "hello"},
+        "response": {"answer": "string", "think": "string"},
+        "frontend_reads": ["answer", "think"]
+      }
+    ]
+  },
+  "/chat/mode_change": {
+    "methods": [
+      {
+        "method": "POST",
+        "auth": false,
+        "request": {"mode": "1"},
+        "response": true
+      }
+    ]
+  },
+  "/chat/sessions": {
+    "methods": [
+      {
+        "method": "GET",
+        "auth": false,
+        "request": {},
+        "response": {"sessions": []}
+      }
+    ]
+  },
+  "/chat/new_session": {
+    "methods": [
+      {
+        "method": "POST",
+        "auth": false,
+        "request": {"session_num": 1},
+        "response": {"ok": "boolean", "session_id": "string", "session_num": "number"}
+      }
+    ]
+  },
+  "/chat/chose_session": {
+    "methods": [
+      {
+        "method": "POST",
+        "auth": false,
+        "request": {"session_num": 1},
+        "response": {"ok": "boolean", "msg": "string"}
+      }
+    ]
+  },
+  "/chat/delete_session": {
+    "methods": [
+      {
+        "method": "POST",
+        "auth": false,
+        "request": {"session_num": 1},
+        "response": true
+      }
+    ]
+  },
+  "/chat/get_status": {
+    "methods": [
+      {
+        "method": "POST",
+        "auth": false,
+        "request": {},
+        "response": "dict"
+      }
+    ]
+  },
+  "/chat/history": {
+    "methods": [
+      {
+        "method": "GET",
+        "auth": false,
+        "request": {},
+        "query": {"mode": "string"},
+        "response": [],
+        "response_item": {
+          "created_at": "string",
+          "user": "string",
+          "assistant": "string",
+          "thinking": "list",
+          "task_mode": "nullable:string",
+          "llm_model": "nullable:string",
+          "llm_provider": "nullable:string"
+        }
+      }
+    ]
+  },
+  "/chat/settings/llm": {
+    "methods": [
+      {
+        "method": "GET",
+        "auth": false,
+        "request": {},
+        "response": {"active": "string", "profiles": "dict", "configured": "boolean", "message": "string"}
+      },
+      {
+        "method": "POST",
+        "auth": false,
+        "request": {"active": "deepseek", "profiles": {}},
+        "response": {"active": "string", "profiles": "dict", "configured": "boolean", "message": "string"}
+      }
+    ]
+  },
+  "/chat/settings/llm/test": {
+    "methods": [
+      {
+        "method": "POST",
+        "auth": false,
+        "request": {"provider": "deepseek"},
+        "optional_request": {
+          "base_url": "https://api.deepseek.com",
+          "model": "deepseek-v4-flash",
+          "api_key": "sk-contract-test"
+        },
+        "response": {"ok": "boolean", "message": "string", "provider": "string", "model": "string", "base_url": "string"}
+      }
+    ]
+  }
+}

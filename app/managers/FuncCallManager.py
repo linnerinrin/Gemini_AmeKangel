@@ -12,6 +12,9 @@ base on RAGManager/MemoryManager/ModelManager
 工具的名称/描述/参数schema/实现统一存放在app/tools/registry.py（唯一事实来源）；
 本文件只负责把注册表里的工具绑定到当前管理器实例上，不再自己维护一份工具定义
 """
+from __future__ import annotations
+
+import os
 from pathlib import Path
 
 from app.agent_framework.readonly.fs_read_tools import ReadOnlyFileTools
@@ -19,8 +22,19 @@ from app.agent_framework.readonly.path_guard import PathGuard
 from app.interfaces.IFuncCall import IFuncCall
 from app.tools.adapters.langgraph import build_tools
 
-#工作区根（本文件位于app/managers/下，向上三级即项目根）；只读工具以此判定路径边界
-_WORKSPACE_ROOT = Path(__file__).resolve().parent.parent.parent
+# 只读工具允许读取的根目录：默认放宽到用户目录（桌面/文档等可直接读），
+# 需要更多根目录时用 READONLY_ROOTS（os.pathsep 分隔）显式追加；
+# 凭据类文件（.env / .ssh / *.pem / Cookies 等）仍由 PathGuard 黑名单拒绝。
+_DEFAULT_READONLY_ROOT = Path.home()
+
+
+def _readonly_roots() -> list[str]:
+    """读取只读工具的允许根目录；环境变量非法时回退到用户目录。"""
+    raw = os.environ.get("READONLY_ROOTS", "").strip()
+    if not raw:
+        return [str(_DEFAULT_READONLY_ROOT)]
+    parts = [item.strip() for item in raw.split(os.pathsep) if item.strip()]
+    return parts or [str(_DEFAULT_READONLY_ROOT)]
 
 
 class FunctionCallManager(IFuncCall):
@@ -36,7 +50,7 @@ class FunctionCallManager(IFuncCall):
         super().__init__()
         self.tools = []
         self._status_changed_this_turn = False
-        self.readonly_tools = ReadOnlyFileTools(PathGuard(str(_WORKSPACE_ROOT)))
+        self.readonly_tools = ReadOnlyFileTools(PathGuard(_readonly_roots()))
         from app.tools.registry import MCP_CLIENT  #函数内导入：与模块顶部导入链对齐
         self.mcp_client = MCP_CLIENT
 

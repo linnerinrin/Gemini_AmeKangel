@@ -36,8 +36,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, List
 
-#工作区根（本文件位于app/tools/下，向上三级即项目根）；不取config.PROJECT_ROOT
+#项目根（本文件位于app/tools/下，向上三级即项目根）；不取config.PROJECT_ROOT
 # 是为了避免config→注册表→config的循环导入，且路径语义与本文件位置天然一致
+# 只读工具的读取边界不在这里：实际根目录由FuncCallManager按READONLY_ROOTS（默认用户目录）注入
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 #注册表导入期的告警走标准logging（本文件不导入config，避免config→注册表→config循环导入）
@@ -268,7 +269,8 @@ TOOL_REGISTRY: List[ToolSpec] = [
 #模块三·附：agent_framework只读工具追加（阶段2接线，F6拍板=追加到末尾）
 # build_readonly_tool_specs内部延迟导入本模块取ToolSpec/SCOPE_INTERNAL，此处调用时
 # 本模块已定义完这两个名字，偏初始化模块也能取到；工具实现经mgr.readonly_tools取实例
-# （F4拍板=挂在FuncCallManager构造里），workspace_root仅作文档语义透传
+# （F4拍板=挂在FuncCallManager构造里），此处传入的workspace_root仅作文档语义；
+# 真正的读取边界由FuncCallManager的READONLY_ROOTS决定
 # """
 from app.agent_framework.readonly.tool_specs import build_readonly_tool_specs
 

@@ -75,19 +75,12 @@ class FakeMemory:
         self.status = None
         self.status_prompts = ""
         self.history = []
-        self.task_mode = "chat"
 
     def init(self, model_mgr):
         self.model_mgr = model_mgr
 
     def bind_session_id(self, session_id):
         self.session_id = session_id
-
-    def set_task_mode(self, task_mode):
-        task_mode = str(task_mode)
-        if task_mode not in ("chat", "work"):
-            raise ValueError(f"未知对话模式: {task_mode}")
-        self.task_mode = task_mode
 
     def load_mode(self, mode):
         self.mode = mode
@@ -97,8 +90,6 @@ class FakeMemory:
 
     def update_short_memory(self, prompt, reply, thinking=None, model=None, provider=None):
         self.last_short = (prompt, reply, thinking)
-        # 落库时用的是当时的任务轴，测试要能验证这一点
-        self.last_short_task_mode = self.task_mode
         # 这一轮透传下来的实际模型（R12）：拿不到就是 (None, None)
         self.last_model_meta = (provider, model)
         self.history.extend([
@@ -132,62 +123,34 @@ def _order_of(prompt, *segments):
 
 
 def test_initial_prompts_follow_base_role_task_order(monkeypatch):
-    """三个节点属性在构造后就是按 (mode, task_mode) 装配好的"""
+    """三个节点属性在构造后就是按 mode 装配好的"""
     session = make_session(monkeypatch)
 
-    assert session.current_task_mode == "chat"
-    assert session.call_prompt == chat_module.config.call_prompt_for("chat")
-    assert session.reflection_prompt == chat_module.config.reflection_prompt_for("chat")
+    assert session.call_prompt == chat_module.config.call_prompt_for()
+    assert session.reflection_prompt == chat_module.config.reflection_prompt_for()
     base = chat_module.config.BASE_PROMPT
     role = chat_module.config.ROLE_PROMPT[session.current_mode]
-    task = chat_module.config.TASK_PROMPT["chat"]
+    task = chat_module.config.TASK_PROMPT
     assert session.sys_prompt == chat_module.config.join_prompt(base, role, task)
     # 顺序必须是 base -> role -> task
     positions = _order_of(session.sys_prompt, base, role, task)
     assert positions == sorted(positions), f"装配顺序不是 base->role->task: {positions}"
 
 
-def test_switch_task_mode_updates_all_three_node_prompts(monkeypatch):
-    """切换任务轴后 sys_prompt / call_prompt / reflection_prompt 都要随之变化"""
+def test_load_mode_rebuilds_role_segment(monkeypatch):
+    """场景轴变化只换 role 段"""
     session = make_session(monkeypatch)
-    chat_call, chat_sys, chat_reflection = (
-        session.call_prompt, session.sys_prompt, session.reflection_prompt)
-
-    asyncio.run(session.single_chat("hello", task_mode="work"))
-
-    assert session.current_task_mode == "work"
-    assert session.call_prompt != chat_call
-    assert session.sys_prompt != chat_sys
-    assert session.reflection_prompt != chat_reflection
-    assert session.call_prompt == chat_module.config.call_prompt_for("work")
-    assert session.reflection_prompt == chat_module.config.reflection_prompt_for("work")
-    base = chat_module.config.BASE_PROMPT
-    role = chat_module.config.ROLE_PROMPT[session.current_mode]
-    task = chat_module.config.TASK_PROMPT["work"]
-    assert session.sys_prompt == chat_module.config.join_prompt(base, role, task)
-    positions = _order_of(session.sys_prompt, base, role, task)
-    assert positions == sorted(positions), f"装配顺序不是 base->role->task: {positions}"
-    # 切回 chat 也要复原
-    asyncio.run(session.single_chat("hello", task_mode="chat"))
-    assert (session.call_prompt, session.sys_prompt, session.reflection_prompt) == (
-        chat_call, chat_sys, chat_reflection)
-
-
-def test_load_mode_rebuilds_role_segment_but_keeps_task_axis(monkeypatch):
-    """场景轴变化只换 role 段，任务轴不受影响"""
-    session = make_session(monkeypatch)
-    asyncio.run(session.single_chat("hello", task_mode="work"))
-    work_task = chat_module.config.TASK_PROMPT["work"]
+    asyncio.run(session.single_chat("hello"))
+    task = chat_module.config.TASK_PROMPT
 
     session.load_mode("2")
 
     assert session.current_mode == "2"
-    assert session.current_task_mode == "work"
     assert chat_module.config.ROLE_PROMPT["2"] in session.sys_prompt
     assert chat_module.config.ROLE_PROMPT["0"] not in session.sys_prompt
-    assert session.sys_prompt.endswith(work_task)
-    assert session.call_prompt == chat_module.config.call_prompt_for("work")
-    assert session.reflection_prompt == chat_module.config.reflection_prompt_for("work")
+    assert session.sys_prompt.endswith(task)
+    assert session.call_prompt == chat_module.config.call_prompt_for()
+    assert session.reflection_prompt == chat_module.config.reflection_prompt_for()
 
 
 def test_refresh_delegates_to_memory(monkeypatch):
@@ -196,93 +159,6 @@ def test_refresh_delegates_to_memory(monkeypatch):
 
     assert session.memory_mgr.session_id == "session-1"
     assert session.status is None
-
-
-def test_refresh_syncs_task_mode_from_memory(monkeypatch):
-    """任务轴以 MemoryManager 为准，refresh 之后不能两边不一致"""
-    session = make_session(monkeypatch)
-    session.memory_mgr.task_mode = "work"
-
-    session.refresh("session-1")
-
-    assert session.current_task_mode == "work"
-
-
-def test_validate_task_mode_keeps_current_and_rejects_unknown(monkeypatch):
-    session = make_session(monkeypatch)
-
-    assert session.current_task_mode == "chat"
-    assert session.validate_task_mode(None) == "chat"
-    assert session.validate_task_mode("work") == "work"
-    with pytest.raises(ValueError, match="未知对话模式"):
-        session.validate_task_mode("sleep")
-    assert session.current_task_mode == "chat"
-
-
-def test_single_chat_sets_task_mode_before_turn(monkeypatch):
-    """任务轴必须在 begin_turn 之前落定：load_mode 会按轴重载短期记忆"""
-    session = make_session(monkeypatch)
-    order = []
-    original_set = session.memory_mgr.set_task_mode
-
-    def record_set(task_mode):
-        order.append(("task_mode", task_mode))
-        original_set(task_mode)
-
-    def record_begin():
-        order.append(("begin_turn", None))
-
-    session.memory_mgr.set_task_mode = record_set
-    session.fcall_mgr.begin_turn = record_begin
-
-    asyncio.run(session.single_chat("hello", task_mode="work"))
-
-    assert order[0] == ("task_mode", "work")
-    assert order[1] == ("begin_turn", None)
-    assert session.current_task_mode == "work"
-    assert session.memory_mgr.task_mode == "work"
-    # 这一轮落库时带的任务轴是 work
-    assert session.memory_mgr.last_short_task_mode == "work"
-    assert session.memory_mgr.last_short == (
-        "hello", "reply", [{"kind": "text", "text": "think"}],
-    )
-
-
-def test_single_chat_rejects_unknown_task_mode(monkeypatch):
-    session = make_session(monkeypatch)
-    saved = []
-    session.update_memory = lambda *args, **kwargs: saved.append(args)
-
-    with pytest.raises(ValueError, match="未知对话模式"):
-        asyncio.run(session.single_chat("hello", task_mode="sleep"))
-
-    assert saved == []
-    assert session.current_task_mode == "chat"
-    assert session.memory_mgr.task_mode == "chat"
-
-
-def test_stream_chat_carries_task_mode(monkeypatch):
-    """流式路径同样要把任务轴透传到记忆层（顺序与 single_chat 一致）"""
-    session = make_session(monkeypatch)
-    saved = []
-    session.update_memory = lambda *args, **kwargs: saved.append(args)
-
-    assert asyncio.run(session.stream_chat("q", task_mode="work")) == ("reply", "think")
-
-    assert session.current_task_mode == "work"
-    assert session.memory_mgr.task_mode == "work"
-
-
-def test_stream_chat_rejects_unknown_task_mode(monkeypatch):
-    session = make_session(monkeypatch)
-    saved = []
-    session.update_memory = lambda *args, **kwargs: saved.append(args)
-
-    with pytest.raises(ValueError, match="未知对话模式"):
-        asyncio.run(session.stream_chat("q", task_mode="unknown"))
-
-    assert saved == []
-    assert session.memory_mgr.task_mode == "chat"
 
 
 def test_single_chat_updates_memory_and_history(monkeypatch):

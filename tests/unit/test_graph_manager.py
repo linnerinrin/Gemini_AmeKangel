@@ -310,34 +310,29 @@ def test_agent_rejects_truncated_tool_calls_before_routing():
         asyncio.run(make_manager(session).agent_node({"agent_message": [], "query": "q"}))
 
 
-def node_prompt_sessions(task_mode, sys_prompt):
-    """两轴正交下的桩 session：三个节点提示词都带上自身的 task_mode 便于断言"""
-    call_prompt = f"call-{task_mode}"
-    reflection_prompt = f"reflection-{task_mode}"
+def node_prompt_sessions(sys_prompt):
+    """桩 session：三个节点提示词都从 session 上读，便于断言"""
     agent_session = types.SimpleNamespace(
-        task_mode=task_mode,
-        call_prompt=call_prompt,
+        call_prompt="call-prompt",
         sys_prompt=sys_prompt,
-        reflection_prompt=reflection_prompt,
+        reflection_prompt="reflection-prompt",
         model_mgr=FakeModel([types.SimpleNamespace(content="think", tool_calls=[])]),
         config=types.SimpleNamespace(think_para={"temperature": 0.2}),
         memory_mgr=types.SimpleNamespace(tools=[]),
     )
     reply_session = types.SimpleNamespace(
-        task_mode=task_mode,
-        call_prompt=call_prompt,
+        call_prompt="call-prompt",
         sys_prompt=sys_prompt,
-        reflection_prompt=reflection_prompt,
+        reflection_prompt="reflection-prompt",
         short_memory=[],
         inference_para={"temperature": 0.1},
         model_mgr=FakeModel([types.SimpleNamespace(content="reply", tool_calls=[])]),
         memory_mgr=FakeMemory(),
     )
     reflection_session = types.SimpleNamespace(
-        task_mode=task_mode,
-        call_prompt=call_prompt,
+        call_prompt="call-prompt",
         sys_prompt=sys_prompt,
-        reflection_prompt=reflection_prompt,
+        reflection_prompt="reflection-prompt",
         model_mgr=FakeModel([types.SimpleNamespace(content="__ACCEPT__", finish_reason="stop")]),
         config=types.SimpleNamespace(reflect_para={"temperature": 0.3}),
     )
@@ -345,28 +340,12 @@ def node_prompt_sessions(task_mode, sys_prompt):
 
 
 def test_three_nodes_read_their_prompt_from_the_session():
-    """三个节点各读 session 上的一个属性，两轴切换只需换 session 上的值（GraphManager 不改）"""
-    observed = {}
+    """三个节点各读 session 上的一个属性（GraphManager 不内嵌提示词）"""
+    agent_session, reply_session, reflection_session = node_prompt_sessions("sys-prompt")
+    asyncio.run(make_manager(agent_session).agent_node({"agent_message": [], "query": "q"}))
+    asyncio.run(make_manager(reply_session).generate_reply_node({"query": "q"}))
+    asyncio.run(make_manager(reflection_session).reflection_node({"reply": "draft", "query": "q"}))
 
-    async def run(task_mode, sys_prompt):
-        agent_session, reply_session, reflection_session = node_prompt_sessions(task_mode, sys_prompt)
-        await make_manager(agent_session).agent_node({"agent_message": [], "query": "q"})
-        await make_manager(reply_session).generate_reply_node({"query": "q"})
-        await make_manager(reflection_session).reflection_node({"reply": "draft", "query": "q"})
-        observed[task_mode] = {
-            "agent": agent_session.model_mgr.calls[0][0][0]["content"],
-            "generate_reply": reply_session.model_mgr.calls[0][0][0]["content"],
-            "reflection": reflection_session.model_mgr.calls[0][0][0]["content"],
-        }
-
-    asyncio.run(run("chat", "sys-chat"))
-    asyncio.run(run("work", "sys-work"))
-
-    assert observed["chat"] == {
-        "agent": "call-chat", "generate_reply": "sys-chat", "reflection": "reflection-chat",
-    }
-    assert observed["work"] == {
-        "agent": "call-work", "generate_reply": "sys-work", "reflection": "reflection-work",
-    }
-    for node_name in ("agent", "generate_reply", "reflection"):
-        assert observed["chat"][node_name] != observed["work"][node_name], f"{node_name} 未随任务轴变化"
+    assert agent_session.model_mgr.calls[0][0][0]["content"] == "call-prompt"
+    assert reply_session.model_mgr.calls[0][0][0]["content"] == "sys-prompt"
+    assert reflection_session.model_mgr.calls[0][0][0]["content"] == "reflection-prompt"

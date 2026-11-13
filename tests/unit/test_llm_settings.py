@@ -401,7 +401,8 @@ def test_generate_reads_active_profile_every_request(manager_module, settings_en
         "active": "deepseek",
         "profiles": {"deepseek": {"base_url": "https://api.deepseek.com", "model": "deepseek-v4-flash", "api_key": "sk-first-key"}},
     })
-    asyncio.run(manager.generate([], {}, use_tools=False))
+    #阶段4后非流式聚合(use_tools=False)走ChatClientPort；此处钉SDK路径语义，故use_tools=True
+    asyncio.run(manager.generate([], {}, use_tools=True))
     first = FakeAsyncOpenAI.instances[-1]
     assert first.kwargs["api_key"] == "sk-first-key"
     assert first.kwargs["base_url"] == "https://api.deepseek.com"
@@ -412,7 +413,7 @@ def test_generate_reads_active_profile_every_request(manager_module, settings_en
         "active": "custom",
         "profiles": {"custom": {"base_url": "https://switched.example.com/v1", "model": "switched-model", "api_key": "sk-second-key"}},
     })
-    asyncio.run(manager.generate([], {}, use_tools=False))
+    asyncio.run(manager.generate([], {}, use_tools=True))
     second = FakeAsyncOpenAI.instances[-1]
 
     assert len(FakeAsyncOpenAI.instances) == 2
@@ -430,8 +431,9 @@ def test_client_is_cached_while_config_unchanged(manager_module, settings_env):
         "profiles": {"deepseek": {"base_url": "https://api.deepseek.com", "model": "deepseek-v4-flash", "api_key": "sk-same-key"}},
     })
 
-    asyncio.run(manager.generate([], {}, use_tools=False))
-    asyncio.run(manager.generate([], {}, use_tools=False))
+    #阶段4后非流式聚合走端口；客户端缓存钉在SDK路径上，故use_tools=True
+    asyncio.run(manager.generate([], {}, use_tools=True))
+    asyncio.run(manager.generate([], {}, use_tools=True))
 
     # (base_url, api_key) 没变 => 复用同一个客户端
     assert len(FakeAsyncOpenAI.instances) == 1

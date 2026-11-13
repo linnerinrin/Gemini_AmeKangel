@@ -214,11 +214,13 @@ START → agent（决策 / 工具调用）
 | POST | `/chat/start_session` | 绑定存档 |
 | POST | `/chat/new_session` / `chose_session` / `delete_session` | 存档增删选 |
 | GET | `/chat/sessions` | 存档列表 |
-| GET | `/chat/history?mode=` | 历史（每行含 `task_mode` / `llm_provider` / `llm_model`） |
-| POST | `/chat/single_chat` | 非流式对话 |
-| POST | `/chat/stream_chat` | **流式对话（SSE）** |
-| POST | `/chat/mode_change` | 切换场景轴 |
-| POST | `/chat/get_status` | 读取状态栏 |
+| GET | `/chat/history?mode=&session_id=` | 历史（每行含 `task_mode` / `llm_provider` / `llm_model`） |
+| POST | `/chat/single_chat` | 非流式对话（body 带 `session_id`） |
+| POST | `/chat/stream_chat` | **流式对话（SSE）**（body 带 `session_id`） |
+| POST | `/chat/mode_change` | 切换场景轴（body 带 `session_id`） |
+| POST | `/chat/get_status` | 读取状态栏（body 带 `session_id`） |
+
+会话类接口按请求显式声明 `session_id`，路由入口绑定对应存档，不信任全局绑定；换绑仅在生成空闲时进行，生成中请求其他会话会 409。
 | GET / POST | `/chat/settings/llm` | 读取 / 保存模型设置（Key 只回掩码） |
 | POST | `/chat/settings/llm/test` | 模型连通性测试 |
 
@@ -272,3 +274,7 @@ venv\Scripts\python.exe -m pytest -q
 - 状态类工具（`change_status`）在审查通过前即写入数据库，审查失败时状态变更不回滚
 - 长期记忆与 RAG 上下文**不按任务轴隔离**（仅短期记忆按 `mode + task_mode` 隔离）
 - 聊天模式的换行分段依赖提示词约束模型「一条消息内部不换行」；模型若为排版换行，仍可能出现一条话被拆成两条气泡
+
+<!-- [总审计 2026-11-13] P1：:113-140、:204、:217、:275 等段落的 task_mode/work 模式在工作树中已被整体移除
+（config.py/prompts/chat 表/前端控制面板/契约均无该轴），本文件描述已失真；另 F1-F8 未标记“已接入/未做”。
+以代码与 contracts/api_contract.json 为准，待产品拍板是否恢复 work 轴后统一修订。 -->

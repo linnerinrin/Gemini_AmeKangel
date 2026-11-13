@@ -24,6 +24,11 @@ EXPECTED_TOOL_ORDER = [
     "save_memory",
     "search_web",
     "change_status",
+    # 阶段2接线（F6拍板）：agent_framework四个只读工具追加在末尾
+    "read_file",
+    "list_dir",
+    "glob",
+    "grep",
 ]
 
 # 方案 R5：MCP 侧只暴露无状态工具
@@ -83,7 +88,8 @@ def test_payload_is_a_copy_not_the_registry_object():
 def test_external_scope_only_exposes_stateless_tools():
     assert [spec.name for spec in registry.external_specs()] == EXPECTED_EXTERNAL
     internal = [spec.name for spec in registry.TOOL_REGISTRY if spec.scope == registry.SCOPE_INTERNAL]
-    assert internal == ["save_memory", "change_status"]
+    assert internal == ["save_memory", "change_status",
+                        "read_file", "list_dir", "glob", "grep"]
 
 
 def test_langgraph_adapter_binds_registry_name_and_description(monkeypatch):

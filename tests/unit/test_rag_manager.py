@@ -52,7 +52,9 @@ rag_module = load_source_module("rag_manager_under_test", "app/managers/RAGManag
 
 
 class FakeStore:
-    def similarity_search(self, query, k):
+    def similarity_search(self, query, k, filter=None):
+        #记录过滤条件，便于断言context召回带session_id分区
+        self.last_filter = filter
         return [type("Doc", (), {"page_content": f"{query}:{k}"})()]
 
     def add_documents(self, docs):
@@ -85,3 +87,24 @@ def test_rerank_maps_scores():
     mgr.cross_encoder = FakeCrossEncoder()
 
     assert mgr.rerank("q", ["doc"]) == [{"prompts": "doc", "value": 0.9}]
+
+
+def test_context_recall_filters_by_bound_session():
+    mgr = rag_module.RAGManager.__new__(rag_module.RAGManager)
+    mgr.recall_num = 1
+    store = FakeStore()
+    mgr.vector_store = {"context": store}
+    mgr.current_session_id = "session-1"
+
+    assert mgr.recall("q", "context") == ["q:1"]
+    #召回必须带当前存档的metadata过滤，否则跨存档串味
+    assert store.last_filter == {"session_id": "session-1"}
+
+
+def test_context_recall_without_bound_session_returns_empty():
+    mgr = rag_module.RAGManager.__new__(rag_module.RAGManager)
+    mgr.recall_num = 1
+    mgr.vector_store = {"context": FakeStore()}
+    mgr.current_session_id = None
+
+    assert mgr.recall("q", "context") == []

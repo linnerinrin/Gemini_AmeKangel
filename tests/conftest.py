@@ -92,8 +92,6 @@ class FakeChatService:
         self.memory_mgr = FakeMemoryManager()
         self.mode = None
         self.session_id = None
-        # 记录路由透传过来的任务轴，供 API 层测试断言
-        self.last_task_mode = None
 
     def bind_session_id(self, session_id):
         self.session_id = session_id
@@ -102,14 +100,12 @@ class FakeChatService:
         self.session_id = None
         self.history = []
 
-    async def single_chat(self, prompt, mode=None, task_mode=None):
+    async def single_chat(self, prompt, mode=None):
         self.mode = mode if mode is not None else self.mode
-        self.last_task_mode = task_mode
         return "回复", "思考"
 
-    async def stream_chat(self, prompt, mode=None, on_event=None, task_mode=None):
+    async def stream_chat(self, prompt, mode=None, on_event=None):
         self.mode = mode if mode is not None else self.mode
-        self.last_task_mode = task_mode
         if on_event:
             await on_event({"type": "status", "stage": "thinking"})
             await on_event({"type": "thinking_delta", "text": "思考"})

@@ -1,3 +1,8 @@
+# """
+#架构作用：ChatSession的LangGraph编排器，串联决策、工具、回答与严格审查
+#数据流：AgentState增量补丁→ reducer合并→条件边；正式历史由会话层最后写入
+#本类通过session反向引用其他管理器，节点读取的是共享实时状态而非请求快照
+# """
 """
 managers/GraphManager.py  LangGraph图管理器
 Abstract on IGraph
@@ -21,20 +26,24 @@ class ReflectionError(RuntimeError):
     """审查未通过；本轮草稿不得提交为正式历史。"""
 
 
+# """
+#列表字段使用operator.add追加reducer：节点必须返回本轮增量而非完整累计列表
+#标量字段由后一次补丁覆盖；计数用于限制循环，不是数据库事务状态
+# """
 class AgentState(TypedDict):
-    agent_message:Annotated[List[dict],operator.add]  #agentnode节点自迭代传递的信息 仅用于收集  tooltext
+    agent_message:Annotated[List[dict],operator.add]  # agentnode节点自迭代传递的信息仅用于收集tooltext
 
-    think_text:Annotated[List[str],operator.add] #思考链 agentnode的思考文本集合
-    tool_text:Annotated[List[str],operator.add] #工具链 agentnode的工具调用集合
-    reflection_text:Annotated[List[str],operator.add] #反思链 reflection的反思文本集合
+    think_text:Annotated[List[str],operator.add] #思考链agentnode的思考文本集合
+    tool_text:Annotated[List[str],operator.add] #工具链agentnode的工具调用集合
+    reflection_text:Annotated[List[str],operator.add] #反思链reflection的反思文本集合
 
     query:str #查询
     reply:str #回复
 
     tool_finish: bool    #是否完成工具调用
-    tool_turns: int     #tool次数
+    tool_turns: int     # tool次数
     reflection_finish: bool    #是否完成reflection
-    reflection_turns: int   #reflection次数
+    reflection_turns: int   # reflection次数
     reflection_review_retries: int  #单轮请求共享，跨重写最多一次审查重试
     stream_event: object    #可选的异步流式事件回调
 
@@ -55,15 +64,20 @@ class GraphManager(IGraph):
         return self.app
 
     #图节点
+    # """
+    #决策节点读取提示词与上一轮ToolMessage；流式正文改发thinking_delta
+    #输出AIMessage工具调用及本轮增量，工具是否执行由条件边决定
+    #输出截断时拒绝工具调用；打印内容仍可能包含用户派生文本，应控制生产日志
+    # """
     async def agent_node(self, state: AgentState):
-        ####    PART    决策阶段
+        #### PART决策阶段
         session = self.session
         msg= [
             {"role": "system", "content": session.call_prompt},
         ]
 
 
-        ####    PART    工具调用 写思考给自己/回复节点
+        #### PART工具调用写思考给自己/回复节点
         tool_results = [m for m in state["agent_message"] if isinstance(m, ToolMessage)]
         if tool_results:
             tool_text = "\n".join(f"工具({m.name})返回：{m.content}" for m in tool_results)
@@ -86,10 +100,12 @@ class GraphManager(IGraph):
         if output.tool_calls and (getattr(output, "truncated", False) or
                                   getattr(output, "finish_reason", None) == "length"):
             raise ValueError("模型输出已截断，禁止执行工具调用")
-        print(f"tool_calls:{output.tool_calls}")
-        print(f"thinking_text:{output.content}")
+        #调试输出只在 DEBUG 下开：思考文本不应当默认落到控制台日志
+        if config.DEBUG:
+            print(f"tool_calls:{output.tool_calls}")
+            print(f"thinking_text:{output.content}")
         if output.tool_calls and state.get("stream_event"):
-            # 工具名称已在模型流中发过一次，这里仅发送阶段事件，不重复流式参数。
+            #工具名称已在模型流中发过一次，这里仅发送阶段事件，不重复流式参数
             await state["stream_event"]({"type": "tool_calls_ready", "calls": [c["name"] for c in output.tool_calls]})
         return {
             "agent_message": [AIMessage("", tool_calls=output.tool_calls)],
@@ -103,9 +119,12 @@ class GraphManager(IGraph):
             "reflection_finish": False,
         }
 
+    # """
+    #回答前同步读角色状态和长记忆，再拼短记忆、工具文本及查询；返回的是待审草稿
+    # """
     async def generate_reply_node(self, state: AgentState):
 
-        ####  PART 写入状态/长期记忆 提示词
+        #### PART写入状态/长期记忆提示词
         session = self.session
         session.memory_mgr.load_status()
         status_prompt = session.memory_mgr.status_prompts
@@ -119,13 +138,13 @@ class GraphManager(IGraph):
             msg.append({"role": "system", "content": memory_text})
 
 
-        ####  PART 接收reflection提示词
+        #### PART接收reflection提示词
         if state.get("reflection_text"):
             msg.append({"role": "system", "content": f"上一轮回复需要改进：{state['reflection_text'][-1]}"})
         msg += list(session.short_memory)
 
 
-        ####  PART    接收工具调用 查询
+        #### PART接收工具调用查询
         if state.get("tool_text"):
             msg.append({"role": "system", "content": state["tool_text"][-1]})
         msg.append({"role": "user", "content": state["query"]})
@@ -142,10 +161,14 @@ class GraphManager(IGraph):
         if not output.content or not output.content.strip():
             raise ValueError("模型未返回回答正文，请重试")
         if getattr(output, "truncated", False) and state.get("stream_event"):
-            # 被长度上限截断时只提示，不中断，也不丢弃已生成的内容
+            #被长度上限截断时只提示，不中断，也不丢弃已生成的内容
             await state["stream_event"]({"type": "thinking_delta", "text": "\n（本轮回答达到长度上限，已被截断）\n"})
         return {"reply": output.content}
 
+    # """
+    #仅完整stop且正文严格等于__ACCEPT__才通过；拒绝需非空修改意见
+    #格式错误共享一次重试额度，重写次数另计；耗尽抛错而不放行草稿
+    # """
     async def reflection_node(self, state: AgentState):
         session = self.session
         last_reply = state.get("reply")
@@ -188,6 +211,9 @@ class GraphManager(IGraph):
             "reflection_review_retries": review_retries,
         }
 
+    # """
+    #返回节点名称到绑定方法的映射，图构建时注册，执行时读取当前session
+    # """
     def create_nodes(self):
         return {
             "agent": self.agent_node,
@@ -196,6 +222,9 @@ class GraphManager(IGraph):
         }
 
     #路由
+    # """
+    #无工具或到达上限都转回答；因此最后一轮提出的工具可能因预算耗尽而不执行
+    # """
     def toolcall_router(self, state):
         if state.get("tool_finish"):
             return "generate_reply"
@@ -203,13 +232,20 @@ class GraphManager(IGraph):
             return "generate_reply"
         return "tools"
 
+    # """
+    #只有显式通过才能结束；未通过则重写，超额抛错由reflection_node负责而不把草稿当正式回复
+    # """
     def reflection_router(self, state):
         if state.get("reflection_finish"):
             return END
+        #reflection_node正常会先抛超额错误，这里保留兜底：被单独调用或状态被绕过构造时也要抛
         if state.get("reflection_turns", 0) > MAX_REFLECTION_TURNS:
-            raise ReflectionError("审查明确不通过，回复重写次数已耗尽")
+            raise ReflectionError("审查未通过且重写次数已耗尽，终止本轮回复")
         return "generate_reply"
 
+    # """
+    #条件边的路由表，与create_graph使用的键保持一致；返回的是方法而非执行结果
+    # """
     def create_routers(self):
         return {
             "agent_generate":self.toolcall_router,
@@ -217,6 +253,10 @@ class GraphManager(IGraph):
         }
 
     #图构建
+    # """
+    #建图一次并复用：START→决策→工具循环/回答→审查→END或重写
+    # ToolNode使用agent_message键；包装器只发阶段事件并await执行工具
+    # """
     def create_graph(self, nodes,routers, tools):
         builder = StateGraph(AgentState)
         builder.add_node("agent", nodes["agent"])
@@ -237,5 +277,8 @@ class GraphManager(IGraph):
 
         return builder.compile()
 
+    # """
+    #保存当前场景标签；提示词与记忆实际由ChatSession协调更新，此处不重建图
+    # """
     def load_mode(self, mode):
         self.current_mode=mode

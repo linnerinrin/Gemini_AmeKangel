@@ -44,7 +44,7 @@ def test_refresh_loads_session_state(monkeypatch):
         (60, 50, 20, 10),
     ]
     fake_db.fetchall_queue = [
-        [("q1", "a1", "2026-01-01", '{"v": 1, "items": [{"kind": "text", "text": "想了"}]}', "work",
+        [("q1", "a1", "2026-01-01", '{"v": 1, "items": [{"kind": "text", "text": "想了"}]}',
           "deepseek-v4-flash", "deepseek")],
         [("q2", "a2")],
     ]
@@ -61,16 +61,13 @@ def test_refresh_loads_session_state(monkeypatch):
     assert mgr.men == 10
     assert mgr.history == [
         {"created_at": "2026-01-01", "user": "q1", "assistant": "a1",
-         "thinking": [{"kind": "text", "text": "想了"}], "task_mode": "work",
+         "thinking": [{"kind": "text", "text": "想了"}],
          "llm_model": "deepseek-v4-flash", "llm_provider": "deepseek"},
     ]
     assert list(mgr.short_memory) == [
         {"role": "user", "content": "q2"},
         {"role": "assistant", "content": "a2"},
     ]
-    # 短期记忆要按任务轴过滤，history 要带上每轮的 task_mode
-    assert "and task_mode=%s" in _sql(fake_db, "select query,reply from chat")
-    assert "task_mode" in _sql(fake_db, "select query,reply,created_at,thinking")
     # 迁移已移到应用启动阶段，refresh 只负责读取状态
     assert not any("alter table chat add column thinking" in sql for sql, _ in fake_db.calls)
 
@@ -78,9 +75,9 @@ def test_refresh_loads_session_state(monkeypatch):
 def test_read_history_decodes_thinking_and_tolerates_bad_data(monkeypatch):
     fake_db = FakeDB()
     fake_db.fetchall_queue = [[
-        ("q1", "a1", "t1", '{"v": 1, "items": [{"kind": "node", "name": "agent"}]}', "chat", None, None),
-        ("q2", "a2", "t2", None, "work", "gpt-4o-mini", "openai"),
-        ("q3", "a3", "t3", "早期纯文本思考", None, None, None),
+        ("q1", "a1", "t1", '{"v": 1, "items": [{"kind": "node", "name": "agent"}]}', None, None),
+        ("q2", "a2", "t2", None, "gpt-4o-mini", "openai"),
+        ("q3", "a3", "t3", "早期纯文本思考", None, None),
     ]]
     monkeypatch.setattr(memory_module, "db", fake_db)
 
@@ -92,7 +89,6 @@ def test_read_history_decodes_thinking_and_tolerates_bad_data(monkeypatch):
     assert history[1]["thinking"] == []
     assert history[2]["thinking"] == [{"kind": "text", "text": "早期纯文本思考"}]
     assert "thinking" in fake_db.calls[0][0]
-    assert "task_mode" in fake_db.calls[0][0]
     # 老数据没有模型列时也要正常返回 None，不能因为多两列就报错
     assert history[0]["llm_model"] is None
     assert history[0]["llm_provider"] is None
@@ -105,8 +101,8 @@ def test_read_history_returns_llm_model_and_provider_of_each_turn(monkeypatch):
     """每轮带回当时实际使用的厂商/模型，排查'这轮为什么风格不同'"""
     fake_db = FakeDB()
     fake_db.fetchall_queue = [[
-        ("q1", "a1", "t1", None, "chat", "deepseek-v4-flash", "deepseek"),
-        ("q2", "a2", "t2", None, "chat", None, None),
+        ("q1", "a1", "t1", None, "deepseek-v4-flash", "deepseek"),
+        ("q2", "a2", "t2", None, None, None),
     ]]
     monkeypatch.setattr(memory_module, "db", fake_db)
 
@@ -116,23 +112,6 @@ def test_read_history_returns_llm_model_and_provider_of_each_turn(monkeypatch):
 
     assert [item["llm_model"] for item in history] == ["deepseek-v4-flash", None]
     assert [item["llm_provider"] for item in history] == ["deepseek", None]
-
-
-def test_read_history_returns_task_mode_of_each_turn(monkeypatch):
-    """work 与 chat 的历史各自带回自己的 task_mode，前端才能区分（P4 分段渲染用）"""
-    fake_db = FakeDB()
-    fake_db.fetchall_queue = [[
-        ("q1", "a1", "t1", None, "chat", None, None),
-        ("q2", "a2", "t2", None, "work", None, None),
-    ]]
-    monkeypatch.setattr(memory_module, "db", fake_db)
-
-    mgr = memory_module.MemoryManager()
-    mgr.session_id = "session-1"
-    history = mgr.read_history("0")
-
-    assert [item["task_mode"] for item in history] == ["chat", "work"]
-    assert [item["user"] for item in history] == ["q1", "q2"]
 
 
 def test_update_short_memory_commits(monkeypatch):
@@ -146,13 +125,11 @@ def test_update_short_memory_commits(monkeypatch):
     assert fake_db.committed
     sql, params = fake_db.calls[-1]
     assert "thinking" in sql
-    assert "task_mode" in sql
     assert "llm_model" in sql
     assert "llm_provider" in sql
     assert params[4] is None      # 没有思考内容时写 NULL
-    assert params[5] == "chat"    # 默认任务轴是闲聊
-    assert params[6] is None      # 拿不到模型名时写 NULL，不能报错
-    assert params[7] is None
+    assert params[5] is None      # 拿不到模型名时写 NULL，不能报错
+    assert params[6] is None
 
 
 def test_update_short_memory_stores_structured_trace(monkeypatch):
@@ -168,21 +145,6 @@ def test_update_short_memory_stores_structured_trace(monkeypatch):
     sql, params = fake_db.calls[-1]
     assert "thinking" in sql
     assert json.loads(params[4]) == {"v": 1, "items": trace}
-    assert params[5] == "chat"
-
-
-def test_update_short_memory_writes_current_task_mode(monkeypatch):
-    fake_db = FakeDB()
-    monkeypatch.setattr(memory_module, "db", fake_db)
-
-    mgr = memory_module.MemoryManager()
-    mgr.session_id = "session-1"
-    mgr.set_task_mode("work")
-    mgr.update_short_memory("q", "a")
-
-    sql, params = fake_db.calls[-1]
-    assert "task_mode" in sql
-    assert params[5] == "work"
 
 
 def test_update_short_memory_writes_llm_model_and_provider(monkeypatch):
@@ -197,25 +159,13 @@ def test_update_short_memory_writes_llm_model_and_provider(monkeypatch):
     sql, params = fake_db.calls[-1]
     assert "llm_model" in sql
     assert "llm_provider" in sql
-    assert params[6] == "gpt-4o-mini"
-    assert params[7] == "openai"
+    assert params[5] == "gpt-4o-mini"
+    assert params[6] == "openai"
     assert fake_db.committed
 
 
-def test_set_task_mode_rejects_unknown_axis():
-    mgr = memory_module.MemoryManager()
-
-    assert mgr.task_mode == "chat"
-    mgr.set_task_mode("work")
-    assert mgr.task_mode == "work"
-    with pytest.raises(ValueError, match="未知对话模式"):
-        mgr.set_task_mode("sleep")
-    # 非法值不能污染当前任务轴
-    assert mgr.task_mode == "work"
-
-
-def test_load_short_memory_filters_by_task_mode(monkeypatch):
-    """决策 R7：不同任务轴的短期记忆互相不可见，SQL 必须带上 task_mode 参数。"""
+def test_load_short_memory_filters_by_session_and_mode(monkeypatch):
+    """短期记忆按会话+场景轴过滤。"""
     fake_db = FakeDB()
     fake_db.fetchall_queue = [[("q", "a")]]
     monkeypatch.setattr(memory_module, "db", fake_db)
@@ -224,12 +174,11 @@ def test_load_short_memory_filters_by_task_mode(monkeypatch):
     mgr.session_id = "session-1"
     mgr.mode = "0"
     mgr.short_memory = deque(maxlen=3)
-    mgr.set_task_mode("work")
     mgr.load_short_memory()
 
     sql, params = fake_db.calls[-1]
-    assert "task_mode=%s" in sql
-    assert params == ("session-1", "0", "work", memory_module.config.SHORT_MEMORY_LEN)
+    assert "mode=%s" in sql
+    assert params == ("session-1", "0", memory_module.config.SHORT_MEMORY_LEN)
     assert list(mgr.short_memory) == [
         {"role": "user", "content": "q"},
         {"role": "assistant", "content": "a"},

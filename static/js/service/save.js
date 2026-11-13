@@ -104,6 +104,7 @@ function enterSaveSlot(slotNum) {
 function createAndEnterSaveSlot(slotNum) {
   NGO.saveAPI.newSession(slotNum).then(function(res) {
     if (!res.ok) { showError(res.msg || '存档创建失败'); return; }
+    NGO.currentSessionId = res.session_id || null;
     registerSaveSlot(slotNum); enterSaveSlot(slotNum);
   }).catch(function(err) { showError(err.message || '存档创建失败'); });
 }
@@ -111,6 +112,7 @@ function createAndEnterSaveSlot(slotNum) {
 function chooseAndEnterSaveSlot(slotNum) {
   NGO.saveAPI.chooseSession(slotNum).then(function(res) {
     if (!res.ok) { showError(res.msg || '存档会话启动失败'); return; }
+    NGO.currentSessionId = res.session_id || null;
     enterSaveSlot(slotNum);
   }).catch(function(err) { showError(err.message || '存档会话启动失败'); });
 }
@@ -119,6 +121,7 @@ function finishDeleteSaveSlot(slotNum) {
   unregisterSaveSlot(slotNum);
   if (currentSaveSlot === slotNum) {
     currentSaveSlot = null;
+    NGO.currentSessionId = null;
     resetDesktopState();
     document.querySelectorAll('.desktop-icon.other').forEach(function(icon) { icon.classList.add('hidden'); });
     var ytLabel = document.getElementById('yt-label');

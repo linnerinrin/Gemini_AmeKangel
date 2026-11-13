@@ -2,9 +2,8 @@
  * tests/control_panel_behavior.cjs — P5a 控制面板行为测试
  *
  * 覆盖：
- * 1. 切换「对话模式」写入 NGO.taskMode 并持久化到 localStorage；
- * 2. 「保存」调用正确的接口（/chat/settings/llm）与载荷（active + profiles）；
- * 3. API Key 输入框不被回填明文 key，保存时也不会把掩码当明文提交。
+ * 1. 「保存」调用正确的接口（/chat/settings/llm）与载荷（active + profiles）；
+ * 2. API Key 输入框不被回填明文 key，保存时也不会把掩码当明文提交。
  */
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -62,11 +61,6 @@ function makeEl(tag) {
     'llm-status': makeEl('div'),
   };
   els['llm-provider'].value = 'deepseek';
-  const radioChat = makeEl('input');
-  radioChat.value = 'chat';
-  radioChat.checked = true;
-  const radioWork = makeEl('input');
-  radioWork.value = 'work';
 
   const storage = new Map();
   const localStorage = {
@@ -80,7 +74,7 @@ function makeEl(tag) {
     console, setTimeout, clearTimeout, JSON, Promise, URL, fetch: undefined,
     document: {
       getElementById: id => els[id] || null,
-      querySelectorAll: selector => (selector === 'input[name="task-mode"]' ? [radioChat, radioWork] : []),
+      querySelectorAll: () => [],
       querySelector: () => null,
       addEventListener: () => {},
     },
@@ -116,27 +110,7 @@ function makeEl(tag) {
   const model = ctx.NGO.controlPanelModel;
   assert.ok(model, 'controlPanelModel 必须导出，供行为测试断言');
 
-  // ═══ 1. 对话模式：写 NGO.taskMode + localStorage ═══
-  assert.equal(ctx.NGO.taskMode, 'chat', '默认任务轴是 chat');
-  assert.equal(radioChat.checked, true);
-
-  radioWork.checked = true;
-  radioWork.fire('change');
-  assert.equal(ctx.NGO.taskMode, 'work', '切换模式必须写 NGO.taskMode');
-  assert.equal(localStorage.getItem(model.taskModeKey), 'work', '模式必须持久化到 localStorage');
-
-  radioChat.checked = true;
-  radioChat.fire('change');
-  assert.equal(ctx.NGO.taskMode, 'chat');
-  assert.equal(localStorage.getItem(model.taskModeKey), 'chat');
-
-  // 非法值兜底，避免写坏 NGO.taskMode 让 registry 的 getTaskMode 拿到垃圾
-  assert.equal(model.normalizeTaskMode('work'), 'work');
-  assert.equal(model.normalizeTaskMode('sleep'), 'chat');
-  assert.equal(model.normalizeTaskMode(undefined), 'chat');
-  assert.equal(model.initialTaskMode(null, null), null, '没有已存值时应返回 null');
-
-  // ═══ 2. 打开面板拉设置：key 输入框不被回填明文 ═══
+  // ═══ 1. 打开面板拉设置：key 输入框不被回填明文 ═══
   const settingsPayload = {
     active: 'deepseek',
     providers: [
@@ -252,7 +226,7 @@ function makeEl(tag) {
   assert.equal(requests.at(-1).body.profiles.deepseek.api_key, PLAINTEXT_KEY, '重渲染后点保存必须提交明文 key');
   assert.equal(els['llm-api-key'].value, '', '保存成功后仍然要清空输入框');
 
-  console.log('JS control panel behavior: task mode persistence, settings load/save payloads, masked key never echoed, connectivity test, focus re-render keeps typed key passed');
+  console.log('JS control panel behavior: settings load/save payloads, masked key never echoed, connectivity test, focus re-render keeps typed key passed');
 })().catch(error => {
   console.error(error);
   process.exitCode = 1;

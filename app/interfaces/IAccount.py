@@ -1,7 +1,11 @@
+# """
+#架构作用：存档会话管理的抽象接口，供账户管理器实现列表、创建、选择和删除
+#数据流：路由请求槽位操作→ IAccount实现→存档元数据/活动会话
+# """
 """
 interface/IAccount
 用于管理存档会话
-    ***_session 对***会话进行管理
+    ***_session对***会话进行管理
 """
 from abc import ABC,abstractmethod
 

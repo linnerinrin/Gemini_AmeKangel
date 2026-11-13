@@ -43,10 +43,13 @@ def test_backend_routes_follow_contract(client, contracts, path, method):
             json={"session_num": contract["request"]["session_num"]},
         )
 
+    # /chat/history 的会话归属走查询参数（GET 无请求体），其余走 JSON body
+    params = {"session_id": "session-1"} if path == "/chat/history" else None
     response = client.request(
         method,
         path,
         json=contract["request"],
+        params=params,
     )
 
     assert response.status_code == 200
@@ -63,20 +66,19 @@ def test_history_response_item_shape_follows_contract(client, fake_services, con
         "user": "你好",
         "assistant": "回复",
         "thinking": [{"kind": "text", "text": "想了"}],
-        "task_mode": "chat",
         "llm_model": "deepseek-v4-flash",
         "llm_provider": "deepseek",
     }
     client.post("/chat/new_session", json={"session_num": 1})
     fake_services.chat.history_by_mode["2"] = [item]
 
-    payload = client.get("/chat/history?mode=2").json()
+    payload = client.get("/chat/history?mode=2&session_id=session-1").json()
 
     assert len(payload) == 1
     assert set(payload[0]) == set(contract["response_item"])
     assert_shape(payload[0], contract["response_item"])
     # 老数据（新增列之前的历史行）这两列是 NULL，必须仍然满足契约
-    assert_shape(dict(item, task_mode=None, llm_model=None, llm_provider=None),
+    assert_shape(dict(item, llm_model=None, llm_provider=None),
                  contract["response_item"])
 
 
@@ -110,7 +112,7 @@ def test_auth_routes_are_removed(client):
 
 def test_stream_chat_uses_sse_contract(client):
     client.post("/chat/new_session", json={"session_num": 1})
-    response = client.post("/chat/stream_chat", json={"prompt": "hello", "mode": "2"})
+    response = client.post("/chat/stream_chat", json={"prompt": "hello", "session_id": "session-1", "mode": "2"})
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/event-stream")

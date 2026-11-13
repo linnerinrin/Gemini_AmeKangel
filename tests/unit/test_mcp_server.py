@@ -315,7 +315,8 @@ def test_mcp_lifespan_wires_as_app_lifespan_context(mcp_module, server):
 def test_http_initialize_and_list_tools(mcp_module, server):
     """HTTP 路径证据：进程内用 httpx ASGI transport 打 /mcp 的 initialize + tools/list + tools/call。"""
     app = FastAPI()
-    mcp_module.mount_mcp(app, server=server)
+    # DNS rebinding防护默认开启，测试客户端的Host是test，须显式列入allowed_hosts
+    mcp_module.mount_mcp(app, server=server, allowed_hosts=["test"])
 
     async def scenario():
         async with mcp_module.mcp_lifespan(app, server=server):

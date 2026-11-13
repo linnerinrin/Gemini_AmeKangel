@@ -85,7 +85,7 @@ def test_all_prompts_share_the_same_output_discipline():
     四角色仍共用同一份正文边界，断言意图不变。
     """
     for mode in ("0", "1", "2", "3"):
-        prompt = config.sys_prompt_for(mode, "chat")
+        prompt = config.sys_prompt_for(mode)
         assert "输出规范（四种角色使用同一正文边界，各自语气与关系仍有差异）" in prompt
         assert "[理性分析]之类后台标记" in prompt
         assert "允许解释问题" in prompt
@@ -99,62 +99,39 @@ def test_all_prompts_share_the_same_output_discipline():
         assert "<jine_pien_loveforever>" not in prompt
 
 
-def test_dual_axis_prompts_assemble_for_every_mode():
-    """两轴正交：mode 0-3 × task_mode(chat/work) 共 8 组都要能装配出非空提示词"""
+def test_prompts_assemble_for_every_mode():
+    """mode 0-3 都要能装配出非空提示词"""
     for mode in ("0", "1", "2", "3"):
-        chat = config.sys_prompt_for(mode, "chat")
-        work = config.sys_prompt_for(mode, "work")
-        assert chat.strip() and work.strip(), f"mode {mode} 装配结果为空"
+        prompt = config.sys_prompt_for(mode)
+        assert prompt.strip(), f"mode {mode} 装配结果为空"
         # 顺序固定 base -> role -> task
-        assert chat.startswith(config.BASE_PROMPT), f"mode {mode} 未以 base 开头"
-        assert work.startswith(config.BASE_PROMPT), f"mode {mode} 未以 base 开头"
-        assert chat == config.join_prompt(
-            config.BASE_PROMPT, config.ROLE_PROMPT[mode], config.TASK_PROMPT["chat"])
-        assert work == config.join_prompt(
-            config.BASE_PROMPT, config.ROLE_PROMPT[mode], config.TASK_PROMPT["work"])
-        # chat 版本带 @@@ 分段协议；work 版本带工作模式特征（允许代码块）且不使用 @@@ 分段
-        assert "@@@" in chat
-        assert "代码块" in work and "Markdown" in work
-        assert "单独占一行输出 @@@" not in work, f"mode {mode} 的工作模式提示词不应出现 @@ 分段协议"
-        # 两轴真的不一样，装配不是摆设
-        assert chat != work
+        assert prompt.startswith(config.BASE_PROMPT), f"mode {mode} 未以 base 开头"
+        assert prompt == config.join_prompt(
+            config.BASE_PROMPT, config.ROLE_PROMPT[mode], config.TASK_PROMPT)
+        # 带 @@@ 分段协议
+        assert "@@@" in prompt
 
 
-def test_reflection_work_drops_roleplay_rules_but_keeps_protocol():
-    """工作模式审查必须允许代码/Markdown/英文，同时保留审查输出协议（GraphManager 硬依赖）"""
-    prompt = config.reflection_prompt_for("work")
+def test_reflection_prompt_keeps_roleplay_rules_and_protocol():
+    """审查提示词保留审查输出协议（GraphManager 硬依赖）"""
+    prompt = config.reflection_prompt_for()
     # 仍然拦截私密推理与空内容/离题
     assert "私密推理" in prompt
     assert "空内容" in prompt
-    # 角色扮演专属规则不得出现在工作模式审查里
-    for roleplay_rule in ("对白以中文为主", "退回动作描写", "中文表情标签"):
-        assert roleplay_rule not in prompt, f"工作模式审查仍带角色扮演规则：{roleplay_rule}"
-    # 允许并不得退回代码块/Markdown/英文
-    assert "代码块" in prompt and "Markdown" in prompt and "英文" in prompt
+    assert "对白以中文为主" in prompt
     # 输出协议字样必须保留
     assert "__ACCEPT__" in prompt
     assert "需要修改：" in prompt
     assert "冒号后必须有实际问题" in prompt
-    # chat 版本保持原样，确实还在管中文为主
-    assert "对白以中文为主" in config.reflection_prompt_for("chat")
 
 
-def test_node_prompts_have_chat_and_work_variants():
-    """决策/审查两类节点提示词各有 chat/work 两份，且默认属性名仍指 chat 版本"""
-    assert config.call_prompt_for("chat") == config.CALL_PROMPT
-    assert config.reflection_prompt_for("chat") == config.REFLECTION_PROMPT
-    assert config.CALL_WORK_PROMPT.strip() and config.REFLECTION_WORK_PROMPT.strip()
-    assert config.CALL_WORK_PROMPT != config.CALL_PROMPT
-    assert config.REFLECTION_WORK_PROMPT != config.REFLECTION_PROMPT
-    # 决策阶段两份都必须是内部思考，不能承诺不存在的工具轮次
-    assert "决策阶段" in config.CALL_WORK_PROMPT
-    assert "MAX_TOOL_TURNS" in config.CALL_WORK_PROMPT
-    with pytest.raises(ValueError, match="未知对话模式"):
-        config.reflection_prompt_for("sleep")
-    with pytest.raises(ValueError, match="未知对话模式"):
-        config.sys_prompt_for("0", "sleep")
+def test_node_prompts_and_mode_validation():
+    """决策/审查两类节点提示词非空；非法 mode 要拒绝"""
+    assert config.CALL_PROMPT.strip() and config.REFLECTION_PROMPT.strip()
+    assert config.call_prompt_for() == config.CALL_PROMPT
+    assert config.reflection_prompt_for() == config.REFLECTION_PROMPT
     with pytest.raises(ValueError, match="未知聊天模式"):
-        config.sys_prompt_for("9", "chat")
+        config.sys_prompt_for("9")
 
 
 def test_emoji_tables_stay_in_sync_between_backend_and_frontend():

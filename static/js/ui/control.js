@@ -6,54 +6,8 @@
 window.NGO = window.NGO || {};
 
 // ═══════════════════════════════════════
-// P5a：对话模式（任务轴）与模型设置
+// P5a：模型设置
 // ═══════════════════════════════════════
-
-/** 对话模式（任务轴）持久化用的 localStorage key */
-var TASK_MODE_KEY = 'ngo_task_mode';
-
-/** 把任意值归一化到任务轴合法值；非法值兜底 chat */
-function normalizeTaskMode(value) {
-  return value === 'work' ? 'work' : 'chat';
-}
-
-/** 读 localStorage；读不到返回 null（区别于显式的 'chat'） */
-function readTaskMode() {
-  try {
-    var stored = window.localStorage.getItem(TASK_MODE_KEY);
-    return stored === null ? null : normalizeTaskMode(stored);
-  } catch (err) {
-    return null;
-  }
-}
-
-function writeTaskMode(mode) {
-  try { window.localStorage.setItem(TASK_MODE_KEY, mode); } catch (err) { /* 隐私模式等：忽略 */ }
-}
-
-/**
- * 打开面板时的任务轴初值：localStorage 优先，其次沿用已挂在 NGO.taskMode 上的值，
- * 都没有才用 chat。返回 null 表示"没有已存值"，调用方不要覆盖 localStorage。
- */
-function initialTaskMode(storedMode, currentMode) {
-  if (typeof storedMode === 'string') return normalizeTaskMode(storedMode);
-  if (typeof currentMode === 'string') return normalizeTaskMode(currentMode);
-  return null;
-}
-
-/** 切换对话模式：写 NGO.taskMode（registry.js 的 getTaskMode 读它）+ 持久化 */
-function applyTaskMode(mode) {
-  var value = normalizeTaskMode(mode);
-  window.NGO.taskMode = value;
-  writeTaskMode(value);
-  return value;
-}
-
-var taskModeStored = readTaskMode();
-var taskModeInitial = initialTaskMode(taskModeStored, window.NGO.taskMode);
-// 即使没有已存值也要落成 'chat'：让 NGO.taskMode 在面板初始化后就永不为 undefined，
-// registry.js 的 getTaskMode 兜底逻辑就不会两头都是空的。
-applyTaskMode(taskModeInitial !== null ? taskModeInitial : 'chat');
 
 /**
  * 构造保存请求体：只把用户真的改过的厂商字段发出去。
@@ -165,10 +119,6 @@ function buildSavePayload(settings, form) {
 
 // 供行为测试调用的纯逻辑出口（不依赖 DOM）
 NGO.controlPanelModel = {
-  taskModeKey: TASK_MODE_KEY,
-  normalizeTaskMode: normalizeTaskMode,
-  initialTaskMode: initialTaskMode,
-  applyTaskMode: applyTaskMode,
   buildSavePayload: buildSavePayload,
   buildDraftPayload: buildDraftPayload,
   // DOM 相关的两个函数也导出：行为测试用它验证"key 输入框不会被回填明文"
@@ -261,20 +211,6 @@ function syncLlmSettings() {
   }
 })();
 
-// 对话模式单选：切换即写 NGO.taskMode（下一次发送就按新任务轴走）
-(function bindTaskModeRadios() {
-  var radios = document.querySelectorAll('input[name="task-mode"]');
-  if (!radios || !radios.length) return;
-  var current = normalizeTaskMode(NGO.taskMode);
-  radios.forEach(function(radio) {
-    radio.checked = radio.value === current;
-    radio.addEventListener('change', function() {
-      if (!radio.checked) return;
-      applyTaskMode(radio.value);
-    });
-  });
-})();
-
 // 打开控制面板时拉一次设置：以后端文件为准（刷新后仍然保留）
 (function registerPanelFocus() {
   var win = document.getElementById('control-window');
@@ -293,3 +229,8 @@ function syncLlmSettings() {
 document.addEventListener('click', function() {
   NGO.playSfx('Click');
 });
+
+// [总审计 2026-11-13] P0 已修复：端点侧完成“凭据—地址绑定”——保存时 base_url 变更而 key
+// 未重输（留空/回传掩码）会被 422 拒绝（见 app/services/llm_settings.py 的
+// _assert_key_binding_unchanged），面板通过 err.message 原样展示该提示。
+// 前端仍保留“仅改字段才提交”的增量 payload 语义，避免把掩码当 key 回传。

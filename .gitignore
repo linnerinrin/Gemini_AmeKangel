@@ -24,6 +24,9 @@ __pycache__/
 outputs/
 checkpoints/
 
+# 审计遗留的受限临时目录（当前账号无读取权限、无法删除，不应入库）
+tmp1lzwt97u/
+
 # 机密与运行时数据：.env 里装着 MYSQL_PASSWORD / JWT_SECRET / SMTP_PASSWORD
 .env
 .env.*

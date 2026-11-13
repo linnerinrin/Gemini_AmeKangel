@@ -328,8 +328,6 @@ NGO.ChatCore = function(channel) {
     var token = {}; NGO.chatBusy = token;
     var key = channel.getContextKey ? channel.getContextKey() : null;
     var mode = channel.getMode ? channel.getMode() : '0';
-    // 任务轴（chat=闲聊 / work=工作）：P5 才会提供 UI 改 NGO.taskMode，这里先兜底 chat
-    var taskMode = channel.getTaskMode ? channel.getTaskMode() : 'chat';
     var generation = NGO.chatSessionGeneration || 0;
     var identity = {generation: generation, key: key, requestId: NGO.chatRequestSequence = (NGO.chatRequestSequence || 0) + 1};
     var controller = new AbortController(); NGO.activeChatController = controller;
@@ -368,11 +366,11 @@ NGO.ChatCore = function(channel) {
     // 显示规则：换行一到，前一段就封口定稿并立刻显示；下一段至少等满 SEG_DELAY 才开始显示，
     // 之后随正文继续增长（已封口的段不再改写）。末尾那段是"增长中的末段"（含未闭合的围栏块）。
     function segOn() { return !!seg; }
-    // 懒建立：正文出现换行才进分段模式；工作模式恒不建立。
+    // 懒建立：正文出现换行才进分段模式。
     // ⚠️ 单行回复（整条没有 \n）必须与改造前完全一致：不建 seg、无闸门、走整条渲染路径。
     function resolveSeg() {
       if (seg) return seg;
-      if (taskMode !== 'chat' || answer.indexOf('\n') === -1) return null;
+      if (answer.indexOf('\n') === -1) return null;
       seg = {shownAt: 0, timer: null, done: false, hasRow: false, shown: 0, finished: false, partsAt: -1, parts: []};
       return seg;
     }
@@ -543,7 +541,7 @@ NGO.ChatCore = function(channel) {
     channel.clearInput(); channel.playSendSfx();
     if (channel.playThinkingAction) channel.playThinkingAction(key);
     try {
-      await NGO.chatAPI.streamChat(text, mode, taskMode, function(event) {
+      await NGO.chatAPI.streamChat(text, mode, function(event) {
         if (finished) return;
         if (!visible()) { cancel(); return; }
         if (event.type === 'thinking_delta') think += event.text || '';
@@ -617,18 +615,15 @@ NGO.ChatCore = function(channel) {
     _lastBarTime = 0;
     (historyArray || []).forEach(function(item, i) {
       if (opts.timeBars !== false) maybeInsertTimeBar(item.created_at, i === 0);
-      // 每轮历史自带任务轴（chat/work）：聊天模式按换行分段，工作模式整条一个气泡
-      var taskMode = item.task_mode === 'work' ? 'work' : 'chat';
       renderMessage(item.user, true, { silent: true });
-      // 回放聊天回复时按换行同步拆成多条（每条独立头像+气泡），无延时、不等待；
-      // 工作模式或单行回复（没有换行）时整条一个气泡。
-      var parts = taskMode === 'chat' ? splitLineSegments(item.assistant) : null;
+      // 回放回复时按换行同步拆成多条（每条独立头像+气泡），无延时、不等待；
+      // 单行回复（没有换行）时整条一个气泡。
+      var parts = splitLineSegments(item.assistant);
       if (!parts) parts = [item.assistant];
       var row = null;
       for (var s = 0; s < parts.length; s++) {
         var part = renderMessage(parts[s], false, { silent: true });
         if (!part) continue;
-        part._taskMode = taskMode;
         if (!row) row = part;   // 思考链挂在第一段那一行上（默认收起，点标记才展开）
       }
       if (row && NGO.thinking && item.thinking && item.thinking.length) {

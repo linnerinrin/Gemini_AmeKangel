@@ -4,7 +4,7 @@
       {
         "method": "POST",
         "auth": false,
-        "request": {"prompt": "hello"},
+        "request": {"prompt": "hello", "session_id": "session-1"},
         "response": {"answer": "string", "think": "string"},
         "frontend_reads": ["answer", "think"]
       }
@@ -15,7 +15,7 @@
       {
         "method": "POST",
         "auth": false,
-        "request": {"mode": "1"},
+        "request": {"mode": "1", "session_id": "session-1"},
         "response": true
       }
     ]
@@ -46,7 +46,7 @@
         "method": "POST",
         "auth": false,
         "request": {"session_num": 1},
-        "response": {"ok": "boolean", "msg": "string"}
+        "response": {"ok": "boolean", "msg": "string", "session_id": "string"}
       }
     ]
   },
@@ -65,7 +65,7 @@
       {
         "method": "POST",
         "auth": false,
-        "request": {},
+        "request": {"session_id": "session-1"},
         "response": "dict"
       }
     ]
@@ -76,14 +76,13 @@
         "method": "GET",
         "auth": false,
         "request": {},
-        "query": {"mode": "string"},
+        "query": {"mode": "string", "session_id": "string"},
         "response": [],
         "response_item": {
           "created_at": "string",
           "user": "string",
           "assistant": "string",
           "thinking": "list",
-          "task_mode": "nullable:string",
           "llm_model": "nullable:string",
           "llm_provider": "nullable:string"
         }

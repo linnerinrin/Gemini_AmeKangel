@@ -38,7 +38,7 @@ def test_init_creates_tools():
 
     mgr.init(rag_mgr=object(), memory_mgr=object(), model_mgr=object())
 
-    assert len(mgr.tools) == 7
+    assert len(mgr.tools) == 11  # 7个原有工具 + 阶段2追加的4个只读工具
 
 
 def test_load_mode_records_mode():
@@ -80,7 +80,7 @@ def test_created_tools_execute_core_branches():
     mgr = func_module.FunctionCallManager()
     mgr.init(rag_mgr=FakeRAG(), memory_mgr=memory, model_mgr=model)
 
-    output_time, retrieve_knowledge, retrieve_context, rewrite, save_memory, search_web, change_status = mgr.tools
+    output_time, retrieve_knowledge, retrieve_context, rewrite, save_memory, search_web, change_status = mgr.tools[:7]
 
     assert output_time()
     assert "knowledge:query" in asyncio.run(retrieve_knowledge("query"))

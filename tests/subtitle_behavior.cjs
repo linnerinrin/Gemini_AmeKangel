@@ -25,23 +25,21 @@ function render(text,final=true,target=overlay){ngo.renderMessageContent(target,
  render('hello world <永远爱你> 后续',false,e);render('hello world <永远爱你> 终稿',true,e);assert.equal(e.firstChild,txt);assert.equal(e.childNodes[1],emoji);
  for(const emojiText of ['<永远爱你>','【好】','[jine_pien_ok]','jine_pien_ok'])for(let split=1;split<emojiText.length;split++){const target=new El();render('prefix'+emojiText.slice(0,split),false,target);render('prefix'+emojiText,false,target);render('prefix'+emojiText,true,target);assert.equal(target.textContent,'prefix');assert.equal(target.childNodes.filter(n=>n.tag==='img').length,1);}
  const history=[{user:'hello',assistant:'history'}];chat.loadHistory(history,{timeBars:false});assert.equal(overlay.classList.contains('show'),false);
- let events=[],traceCalls=[];const taskModes=[];const life=channel.onAnswerLifecycle,updateThink=ngo.thinking.update;
+ let events=[],traceCalls=[];const life=channel.onAnswerLifecycle,updateThink=ngo.thinking.update;
  channel.onAnswerLifecycle=function(type,t,id){events.push(type);return life.call(this,type,t,id);};
  // 思考链现在直接内联到行上，这里观察生产路径（同一数组只追加、identity 稳定）
  ngo.thinking.update=function(row,trace,id){traceCalls.push({t:trace,id:id,length:trace.length});return updateThink.call(this,row,trace,id);};
- ngo.chatAPI={streamChat:async(p,m,tm,cb)=>{taskModes.push(tm);cb({type:'thinking_delta',text:'first'});cb({type:'node',name:'answer'});cb({type:'answer_delta',text:'hel'});cb({type:'answer_delta',text:'lo'});assert.equal(overlay.classList.contains('show'),false);clock.flush(16);assert.equal(overlay.textContent,'hello');const message=area.lastChild,node=message._contentTarget.firstChild,subnode=overlay.firstChild;cb({type:'answer_delta',text:' world'});clock.flush(16);assert.equal(area.lastChild,message);assert.equal(message._contentTarget.firstChild,node);assert.equal(overlay.firstChild,subnode);cb({type:'answer_delta',text:' discarded'});cb({type:'answer_reset'});assert.equal(overlay.textContent,'');clock.flush(0);assert.equal(pendingPaint(),0);cb({type:'answer_delta',text:'new'});cb({type:'done',answer:'new final'});assert.equal(overlay.textContent,'new final');}};
+ ngo.chatAPI={streamChat:async(p,m,cb)=>{cb({type:'thinking_delta',text:'first'});cb({type:'node',name:'answer'});cb({type:'answer_delta',text:'hel'});cb({type:'answer_delta',text:'lo'});assert.equal(overlay.classList.contains('show'),false);clock.flush(16);assert.equal(overlay.textContent,'hello');const message=area.lastChild,node=message._contentTarget.firstChild,subnode=overlay.firstChild;cb({type:'answer_delta',text:' world'});clock.flush(16);assert.equal(area.lastChild,message);assert.equal(message._contentTarget.firstChild,node);assert.equal(overlay.firstChild,subnode);cb({type:'answer_delta',text:' discarded'});cb({type:'answer_reset'});assert.equal(overlay.textContent,'');clock.flush(0);assert.equal(pendingPaint(),0);cb({type:'answer_delta',text:'new'});cb({type:'done',answer:'new final'});assert.equal(overlay.textContent,'new final');}};
  await chat.sendEmoji('jine_pien_ok');assert.deepEqual(events,['start','update','update','reset','done']);assert.equal(hideTimers(),1);
- // 任务轴（chat/work）要跟 mode 一起到 api 层；liveChannel 没写 NGO.taskMode 时兜底 chat
- assert.deepEqual(taskModes,['chat'],'缺省任务轴要兜底成 chat');
  assert.equal(traceCalls[0].t,traceCalls[1].t);assert.equal(traceCalls[0].id,traceCalls.at(-1).id);assert.equal(traceCalls.at(-1).length,2);assert.equal(traceCalls[0].length,1);
  const oldIdentity=traceCalls[0].id,oldHide=[...clock.jobs.values()].find(j=>j.delay>=5000).fn;
- events=[];ngo.chatAPI.streamChat=async(p,m,tm,cb)=>{cb({type:'answer_delta',text:'draft'});clock.flush(16);throw Error('offline');};await chat.sendEmoji('x');clock.flush(0);assert.equal(overlay.textContent,'');assert.equal(pendingPaint(),0);assert.equal(hideTimers(),0);assert.deepEqual(events,['start','update','error']);
+ events=[];ngo.chatAPI.streamChat=async(p,m,cb)=>{cb({type:'answer_delta',text:'draft'});clock.flush(16);throw Error('offline');};await chat.sendEmoji('x');clock.flush(0);assert.equal(overlay.textContent,'');assert.equal(pendingPaint(),0);assert.equal(hideTimers(),0);assert.deepEqual(events,['start','update','error']);
  // Old request/reset/error/timer cannot mutate the new request.
  const fresh={generation:0,key:0,requestId:999};life('start','',fresh);life('update','fresh',fresh);oldHide();life('reset','',oldIdentity);life('error','',oldIdentity);life('done','old',oldIdentity);assert.equal(overlay.textContent,'fresh');
  ctx.currentTopic={id:1};life('update','stale',fresh);assert.equal(overlay.textContent,'');ctx.currentTopic={id:0};
  const next={generation:0,key:0,requestId:1000};life('start','',next);life('done','next',next);ctx.NGO.chatSessionGeneration=1;clock.flush();assert.equal(overlay.textContent,'');
  // Cancellation clears visible draft and its scheduled paint without failure subtitle.
- let cb,release;ngo.chatAPI.streamChat=async(p,m,tm,fn)=>{cb=fn;await new Promise(r=>release=r);};const pending=chat.sendEmoji('x');cb({type:'answer_delta',text:'cancel me'});clock.flush(16);cb({type:'answer_delta',text:'later'});chat.clearMessages();assert.equal(overlay.textContent,'');assert.equal(clock.jobs.size,0);cb({type:'done',answer:'stale'});release();await pending;assert.equal(area.childNodes.length,0);
+ let cb,release;ngo.chatAPI.streamChat=async(p,m,fn)=>{cb=fn;await new Promise(r=>release=r);};const pending=chat.sendEmoji('x');cb({type:'answer_delta',text:'cancel me'});clock.flush(16);cb({type:'answer_delta',text:'later'});chat.clearMessages();assert.equal(overlay.textContent,'');assert.equal(clock.jobs.size,0);cb({type:'done',answer:'stale'});release();await pending;assert.equal(area.childNodes.length,0);
  // External AbortController cleanup is immediate even before transport settles.
  const aborting=chat.sendEmoji('abort');cb({type:'answer_delta',text:'visible draft'});clock.flush(16);cb({type:'answer_delta',text:'queued'});ngo.activeChatController.abort();assert.equal(overlay.textContent,'');assert.equal(clock.jobs.size,0);release();await aborting;
  // Real old/new requests overlap after a session switch; old completion cannot clear the new subtitle.
@@ -50,7 +48,7 @@ function render(text,final=true,target=overlay){ngo.renderMessageContent(target,
  chat.loadHistory(history,{timeBars:false});clock.flush(0);assert.equal(overlay.textContent,'');assert.equal(clock.jobs.size,0);
  // Topic changes reject subsequent transport callbacks and clear the old owned subtitle.
  const topicPending=chat.sendEmoji('topic');cb({type:'answer_delta',text:'topic draft'});clock.flush(16);ctx.currentTopic={id:1};cb({type:'answer_delta',text:'must not paint'});assert.equal(overlay.textContent,'');assert.equal(clock.jobs.size,0);release();await topicPending;ctx.currentTopic={id:0};
- for(const terminal of [{type:'error',message:'protocol failure'},{type:'done',answer:'   '}]){ngo.chatAPI.streamChat=async(p,m,tm,fn)=>{fn({type:'answer_delta',text:'queued draft'});fn(terminal);};await chat.sendEmoji('error');clock.flush(0);assert.equal(overlay.textContent,'');assert.equal(clock.jobs.size,0);}
+ for(const terminal of [{type:'error',message:'protocol failure'},{type:'done',answer:'   '}]){ngo.chatAPI.streamChat=async(p,m,fn)=>{fn({type:'answer_delta',text:'queued draft'});fn(terminal);};await chat.sendEmoji('error');clock.flush(0);assert.equal(overlay.textContent,'');assert.equal(clock.jobs.size,0);}
  // 思考块内联到当轮回复行（走真实 liveChannel + chat.js 生产链路）
  const colOf=row=>row.childNodes.find(n=>n.className&&n.className.includes('msg-col'));
  const blockOf=row=>{const col=colOf(row);return col?col.childNodes.find(n=>n.className&&n.className.includes('think-block')):null;};
@@ -61,7 +59,7 @@ function render(text,final=true,target=overlay){ngo.renderMessageContent(target,
  const snap=[];
  const at=name=>snap.find(s=>s.at===name);
  area.scrollHeight=2000;area.clientHeight=100;area.scrollTop=1900;
- ngo.chatAPI.streamChat=async(p,m,tm,cb2)=>{
+ ngo.chatAPI.streamChat=async(p,m,cb2)=>{
    cb2({type:'node',name:'agent'});
    cb2({type:'thinking_delta',text:'先想一下'});
    thinkRow=area.lastChild;

@@ -130,18 +130,14 @@ function send(){
   if(p&&p.catch)p.catch(function(){});
   return p;
 }
-// 用 registry.js 里 liveChannel 的同一套任务轴语义：读 NGO.taskMode，缺省兜底 chat。
-// （不要硬编码 'chat'，否则 ngo.taskMode='work' 的用例会假绿/挂起。）
-channel.getTaskMode=function(){return (typeof ngo.taskMode==='string'&&ngo.taskMode)?ngo.taskMode:'chat';};
-function setTaskMode(mode){ if(mode)ngo.taskMode=mode; else delete ngo.taskMode; }
 // 发起一条"done 一次性携带完整正文"的分段回复。
 // 注意：这里同步返回 doSend 的 promise，绝不能 async 化——
 // 否则 await segment(...) 会在调用方 step() 之前就把整个发送等完（自锁）。
 function segment(ans){
   // ⚠️ 顺序要紧：clearMessages() 会因为上一轮还留着 _lastIdentity 补发一条 error 生命周期，
   // 必须在清空 life 之前调用，否则这条 error 会被算进本用例的生命周期断言。
-  chat.clearMessages(); clearListeners(); life=[]; setTaskMode('chat');
-  pushEvent(async function(p,m,tm,cb){cb({type:'done',answer:ans});});
+  chat.clearMessages(); clearListeners(); life=[];
+  pushEvent(async function(p,m,cb){cb({type:'done',answer:ans});});
   return send();
 }
 // JINE：真实 registry 里的 jineChannel，用来验证每段是独立「头像 + 气泡」
@@ -155,10 +151,10 @@ const jineTexts=()=>jineArea.childNodes.map(function(n){return n.textContent;});
   // ── 1. 单行回复（整条没有换行）：与改造前完全一致，零变化回归安全网 ──
   // ⚠️ 顺序要紧：clearMessages() 会因为上一轮还留着 _lastIdentity 补发一条 error 生命周期，
   // 必须在清空 life 之前调用，否则这条 error 会被算进本用例的生命周期断言。
-  chat.clearMessages(); clearListeners(); life=[]; setTaskMode('chat');
+  chat.clearMessages(); clearListeners(); life=[];
   const single='你说好，我就懒得搭理了。';
   let release1=null;
-  pushEvent(async function(p,m,tm,cb){
+  pushEvent(async function(p,m,cb){
     cb({type:'answer_delta',text:'你说好，我就'});
     await new Promise(function(r){release1=r;});   // 让 16ms 合并重绘先跑一次
     cb({type:'answer_delta',text:'懒得搭理了。'});
@@ -182,8 +178,8 @@ const jineTexts=()=>jineArea.childNodes.map(function(n){return n.textContent;});
   // ── 2. A\nB\nC → 3 条独立「头像 + 气泡」消息 ──
   // ⚠️ 顺序要紧：clearMessages() 会因为上一轮还留着 _lastIdentity 补发一条 error 生命周期，
   // 必须在清空 life 之前调用，否则这条 error 会被算进本用例的生命周期断言。
-  chat.clearMessages(); clearListeners(); life=[]; setTaskMode('chat');
-  pushEvent(async function(p,m,tm,cb){
+  chat.clearMessages(); clearListeners(); life=[];
+  pushEvent(async function(p,m,cb){
     cb({type:'answer_delta',text:'A\nB\nC'});
     cb({type:'done',answer:'A\nB\nC'});
   });
@@ -237,8 +233,8 @@ const jineTexts=()=>jineArea.childNodes.map(function(n){return n.textContent;});
   // ── 4. 输入锁：最后一段出现前 chatBusy 占用、sendMessage 未 settle；之后才释放 ──
   // ⚠️ 顺序要紧：clearMessages() 会因为上一轮还留着 _lastIdentity 补发一条 error 生命周期，
   // 必须在清空 life 之前调用，否则这条 error 会被算进本用例的生命周期断言。
-  chat.clearMessages(); clearListeners(); life=[]; setTaskMode('chat');
-  pushEvent(async function(p,m,tm,cb){cb({type:'done',answer:'L1\nL2\nL3'});});
+  chat.clearMessages(); clearListeners(); life=[];
+  pushEvent(async function(p,m,cb){cb({type:'done',answer:'L1\nL2\nL3'});});
   const p4=send(); const st4=settleFlag(p4); await tick();
   assertLocked('刚发送');
   assert.equal(rows(),1);
@@ -263,46 +259,24 @@ const jineTexts=()=>jineArea.childNodes.map(function(n){return n.textContent;});
   // 否则那次 clear 会因为上一个请求还在而发一条 error（与分段无关）。
   clearListeners(); chat.clearMessages(); life=[];
   chat.loadHistory([
-    {user:'q1',assistant:'H1\nH2\nH3',task_mode:'chat'},
-    {user:'q2',assistant:'W1\nW2',task_mode:'work'},
-    {user:'q3',assistant:'N1\n\n\nN2',task_mode:'chat'},
-    {user:'q4',assistant:'单行回复',task_mode:'chat'}
+    {user:'q1',assistant:'H1\nH2\nH3'},
+    {user:'q2',assistant:'W1\nW2'},
+    {user:'q3',assistant:'N1\n\n\nN2'},
+    {user:'q4',assistant:'单行回复'}
   ],{timeBars:false});
   // 紧跟 loadHistory 同步断言：不需要 step 任何时钟 → 历史回放没有延时
-  assert.deepEqual(texts(),['q1','H1','H2','H3','q2','W1\nW2','q3','N1','N2','q4','单行回复']);
-  assert.equal(rows(),7,'历史：聊天回复按换行拆开，工作模式整条，单行整条');
+  assert.deepEqual(texts(),['q1','H1','H2','H3','q2','W1','W2','q3','N1','N2','q4','单行回复']);
+  assert.equal(rows(),8,'历史：回复一律按换行拆开，单行整条');
   assert.equal(gateJobs(),0,'历史回放不得排定段间隔定时器：不留延时直接铺开');
   assert.equal(life.length,0,'历史回放保持 silent，不发字幕生命周期');
-
-  // ── 6. 工作模式不分段：含 \n 的回复是一条气泡，换行原样保留 ──
-  const workText='A\nB\nC';
-  clearListeners(); chat.clearMessages(); life=[]; ngo.taskMode='work';
-  pushEvent(async function(p,m,tm,cb){assert.equal(tm,'work');cb({type:'done',answer:workText});});
-  const p6=send(); await tick(); step(1000); await p6;
-  assert.equal(rows(),1,'工作模式整条一个气泡');
-  assert.equal(bubble(1),workText,'工作模式的换行原样保留在同一条消息里');
-  assert.equal(items(),2,'工作模式不产生空气泡');
-  assert.equal(gateJobs(),0,'工作模式没有闸门定时器');
-  delete ngo.taskMode;
-  clearListeners(); chat.clearMessages(); life=[]; setTaskMode('chat');
-  pushEvent(async function(p,m,tm,cb){cb({type:'done',answer:workText});});
-  const p6c=send(); await tick();
-  assert.equal(rows(),1,'聊天模式第一段先出现');
-  step(1000);
-  assert.equal(rows(),2,'同一文本在聊天模式必须按换行分段');
-  step(1000);
-  assert.equal(rows(),3);
-  await p6c;
-  assert.deepEqual(texts(),['hello','A','B','C']);
-  assertFree('聊天模式分段结束');
 
   // ── 7. 空段丢弃：连续空行 / 只含空白的行不产生空气泡；\r\n 兼容 ──
   clearListeners(); chat.clearMessages(); life=[];
   chat.loadHistory([
-    {user:'u1',assistant:'A\n\n\nB',task_mode:'chat'},
-    {user:'u2',assistant:'C\n   \n\t\nD',task_mode:'chat'},
-    {user:'u3',assistant:'E\r\nF\r\nG',task_mode:'chat'},
-    {user:'u4',assistant:'\n\n  \n',task_mode:'chat'}
+    {user:'u1',assistant:'A\n\n\nB'},
+    {user:'u2',assistant:'C\n   \n\t\nD'},
+    {user:'u3',assistant:'E\r\nF\r\nG'},
+    {user:'u4',assistant:'\n\n  \n'}
   ],{timeBars:false});
   assert.deepEqual(texts(),['u1','A','B','u2','C','D','u3','E','F','G','u4'],'空段被丢弃、\r\n 与 \n 同样分段');
   assert.equal(texts().join('').indexOf('\r'),-1,'段内容不残留 \\r');
@@ -310,7 +284,7 @@ const jineTexts=()=>jineArea.childNodes.map(function(n){return n.textContent;});
 
   // ── 8. 段内容不 trim：行首空格、缩进、尾部空格都原样保留 ──
   clearListeners(); chat.clearMessages();
-  chat.loadHistory([{user:'t',assistant:'  保留行首\n\t缩进\t\n尾部  ',task_mode:'chat'}],{timeBars:false});
+  chat.loadHistory([{user:'t',assistant:'  保留行首\n\t缩进\t\n尾部  '}],{timeBars:false});
   assert.equal(rows(),3,'三个段');
   assert.equal(bubble(1),'  保留行首','段内容不得 trim（行首空格）');
   assert.equal(bubble(2),'\t缩进\t','段内容不得 trim（缩进）');
@@ -319,16 +293,16 @@ const jineTexts=()=>jineArea.childNodes.map(function(n){return n.textContent;});
   // ── 9. 代码围栏保护：围栏块不切段 ──
   // (a) 完整围栏：前言 + 围栏块 + 后记 = 3 段（块内的换行不切）
   clearListeners(); chat.clearMessages();
-  chat.loadHistory([{user:'f',assistant:'前言\n```python\nif a:\n    b()\n```\n后记',task_mode:'chat'}],{timeBars:false});
+  chat.loadHistory([{user:'f',assistant:'前言\n```python\nif a:\n    b()\n```\n后记'}],{timeBars:false});
   assert.deepEqual(texts(),['f','前言','```python\nif a:\n    b()\n```','后记'],'围栏块（含围栏行）算同一个段');
   // (b) 整条就是一个围栏块 → 1 段
   clearListeners(); chat.clearMessages();
-  chat.loadHistory([{user:'f2',assistant:'```python\nif a:\n    b()\n```',task_mode:'chat'}],{timeBars:false});
+  chat.loadHistory([{user:'f2',assistant:'```python\nif a:\n    b()\n```'}],{timeBars:false});
   assert.deepEqual(texts(),['f2','```python\nif a:\n    b()\n```'],'整条围栏块不切段');
   // (c) 流式期间围栏还没闭合：按"仍在围栏内"处理，先不切
-  clearListeners(); chat.clearMessages(); life=[]; setTaskMode('chat');
+  clearListeners(); chat.clearMessages(); life=[];
   const rel9=[];
-  pushEvent(async function(p,m,tm,cb){
+  pushEvent(async function(p,m,cb){
     cb({type:'answer_delta',text:'开头\n```python\nif a:'});   // 围栏未闭合
     await new Promise(function(r){rel9.push(r);});
     cb({type:'answer_delta',text:'\n    b()\n```'});           // 围栏闭合，块原地变长
@@ -353,9 +327,9 @@ const jineTexts=()=>jineArea.childNodes.map(function(n){return n.textContent;});
   console.log('[case9] 围栏保护：整条围栏块 rows=' + rows() + '（块内 3 个换行未拆段），文本=' + JSON.stringify(texts()));
 
   // ── 10. 回归卡死①：首段经 16ms 合并重绘显示后，换行才到达（同一个流）──
-  clearListeners(); chat.clearMessages(); life=[]; setTaskMode('chat');
+  clearListeners(); chat.clearMessages(); life=[];
   let release10=null;
-  pushEvent(async function(p,m,tm,cb){
+  pushEvent(async function(p,m,cb){
     cb({type:'answer_delta',text:'第一段'});
     cb({type:'answer_delta',text:'A'});            // 这两帧会被 16ms 合并成一次重绘
     await new Promise(function(r){release10=r;});  // 首段"第一段A"已经显示，换行此刻才到
@@ -382,8 +356,8 @@ const jineTexts=()=>jineArea.childNodes.map(function(n){return n.textContent;});
   noGate('补发段结束');
 
   // ── 11. 回归卡死②：done 之后等剩余段期间 clearMessages() → 输入锁必须释放 ──
-  clearListeners(); chat.clearMessages(); setTaskMode('chat');
-  pushEvent(async function(p,m,tm,cb){cb({type:'done',answer:'X1\nX2'});});
+  clearListeners(); chat.clearMessages();
+  pushEvent(async function(p,m,cb){cb({type:'done',answer:'X1\nX2'});});
   const p11=send(); const st11=settleFlag(p11); await tick();
   assert.equal(rows(),1);
   assertLocked('等待第二段时');
@@ -426,9 +400,9 @@ const jineTexts=()=>jineArea.childNodes.map(function(n){return n.textContent;});
   noGate('字幕逐段切换结束');
 
   // ── 14. 不变式：任何时刻有未显示的段 ⇔ 存在已排定的闸门定时器（末段显示后为 0）──
-  clearListeners(); chat.clearMessages(); setTaskMode('chat');
+  clearListeners(); chat.clearMessages();
   let release14=null;
-  pushEvent(async function(p,m,tm,cb){
+  pushEvent(async function(p,m,cb){
     cb({type:'answer_delta',text:'I1\nI2\nI3'});
     await new Promise(function(r){release14=r;});
     cb({type:'done',answer:'I1\nI2\nI3'});
@@ -451,9 +425,9 @@ const jineTexts=()=>jineArea.childNodes.map(function(n){return n.textContent;});
   // ── 15. JINE：每段是独立「头像 + 气泡」 ──
   // ⚠️ 顺序要紧：clearMessages() 会因为上一轮还留着 _lastIdentity 补发一条 error 生命周期，
   // 必须在清空 life 之前调用，否则这条 error 会被算进本用例的生命周期断言。
-  chat.clearMessages(); clearListeners(); life=[]; setTaskMode('chat');
+  chat.clearMessages(); clearListeners(); life=[];
   const jine=ngo.ChatCore(ctx.jineChannel);
-  jine.loadHistory([{user:'U',assistant:'J1\nJ2\nJ3',task_mode:'chat'}],{timeBars:false});
+  jine.loadHistory([{user:'U',assistant:'J1\nJ2\nJ3'}],{timeBars:false});
   assert.equal(jineRows().length,3,'JINE 历史三段 = 三条独立行');
   jineRows().forEach(function(r,i){
     assert.equal(r.children.length,2,'JINE 每段是「头像 + 气泡」两项，没有多余空元素');
@@ -464,7 +438,7 @@ const jineTexts=()=>jineArea.childNodes.map(function(n){return n.textContent;});
   // JINE 实时流式同样逐段新建「头像 + 气泡」
   clearListeners(); life=[]; jine.clearMessages();
   el('jine-input').value='hi';
-  pushEvent(async function(p,m,tm,cb){cb({type:'done',answer:'K1\nK2'});});
+  pushEvent(async function(p,m,cb){cb({type:'done',answer:'K1\nK2'});});
   const jp=jine.sendMessage(); jp.catch(function(){});
   await tick();
   assert.equal(jineRows().length,1,'JINE 第一段先出现');

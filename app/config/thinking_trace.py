@@ -1,8 +1,13 @@
+# """
+#架构作用：将SSE思考事件累积成版本化结构并在数据库文本列往返编码
+#调用方：流式消费端累积事件，历史读取端解码供前端渲染
+#数据流：事件→ items → JSON；旧文本/损坏形状尽量降级保留
+# """
 """
-config/thinking_trace.py  思考链的结构化存取
+config/thinking_trace.py思考链的结构化存取
 
-前端把思考链渲染成一串"带类型的项"（节点 / 工具 / 文本），历史回放要还原成同样的折叠块，
-所以入库前统一编码成 JSON，读出来再解码成同一形状。
+前端把思考链渲染成一串"带类型的项"（节点/工具/文本），历史回放要还原成同样的折叠块，
+所以入库前统一编码成JSON，读出来再解码成同一形状
 
 存储格式（chat.thinking，mediumtext）：
     {"v": 1, "items": [{"kind": "node", "name": "agent"},
@@ -36,7 +41,7 @@ def append_event(items, event):
         text = event.get("text") or ""
         if not text:
             return False
-        # 相邻文本合并成一项：前端逐条渲染，合并后回放效果一样，但存储小得多
+        #相邻文本合并成一项：前端逐条渲染，合并后回放效果一样，但存储小得多
         if items and items[-1].get("kind") == TEXT:
             items[-1]["text"] = (items[-1].get("text") or "") + text
         else:
@@ -72,12 +77,12 @@ def decode(raw):
     try:
         data = json.loads(raw)
     except (TypeError, ValueError):
-        # 手工写入或早期纯文本：按一段文本处理，至少不丢内容
+        #手工写入或早期纯文本：按一段文本处理，至少不丢内容
         return [{"kind": TEXT, "text": str(raw)}]
     if isinstance(data, dict):
         items = data.get("items")
         return [item for item in items if isinstance(item, dict)] if isinstance(items, list) else []
     if isinstance(data, list):
         return [item for item in data if isinstance(item, dict)]
-    # JSON 标量（例如误写了一个数字）：当作文本保留，不假装有思考链
+    # JSON标量（例如误写了一个数字）：当作文本保留，不假装有思考链
     return [{"kind": TEXT, "text": data if isinstance(data, str) else json.dumps(data, ensure_ascii=False)}]

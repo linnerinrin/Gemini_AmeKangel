@@ -1,31 +1,45 @@
+# """
+#架构作用：设置路由与模型适配器共用的配置服务，负责磁盘存储、回退、掩码和校验
+#数据流：JSON/环境/预设→生效配置→ SDK；写入先校验再临时文件原子替换
+#明文凭据只应供服务端调用；settings_view生成面板视图，不能用掩码作为SDK密钥
+# """
 """
-services/llm_settings.py  模型设置服务（P5a：只做 OpenAI 兼容厂商）
+services/llm_settings.py模型设置服务（P5a：只做OpenAI兼容厂商）
 
 职责：
-1. 把「厂商 / base_url / model / api_key」持久化到 data/llm_settings.json
-   （写临时文件 + os.replace 原子替换，避免断电/异常留下半截 JSON）；
-2. 读取时把 api_key 掩码，任何接口与日志都不得回传明文；
-3. 设置文件不存在（或缺少 key）时回退到 .env 里的 config.DEEPSEEK_*；
-4. 提供校验，让调用方拿到「请在控制面板配置 API Key」这类可读提示，
-   而不是直接抛一个看不懂的 401。
+1.把「厂商/ base_url / model / api_key」持久化到data/llm_settings.json
+   （写临时文件+ os.replace原子替换，避免断电/异常留下半截JSON）；
+2.读取时把api_key掩码，任何接口与日志都不得回传明文；
+3.设置文件不存在（或缺少key）时回退到.env里的config.DEEPSEEK_*；
+4.提供校验，让调用方拿到「请在控制面板配置API Key」这类可读提示，
+而不是直接抛一个看不懂的401
 """
 
+import ipaddress
 import json
 import os
+import socket
 import tempfile
 from pathlib import Path
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field
 
+from app.agent_framework.security.credential_policy import (
+    CredentialPolicy,
+    normalize_base_url,
+)
 from app.config.config import config
 
-# 掩码里固定保留的头尾长度：sk-5e1****c57e 这种形状
+#凭据—地址绑定策略：保存路径与探测端点共用同一套判定，避免两处规则漂移
+_credential_policy = CredentialPolicy()
+
+#掩码里固定保留的头尾长度：sk-5e1****c57e这种形状
 MASK_HEAD = 7
 MASK_TAIL = 4
 MASK_CHAR = "*"
 
-# OpenAI 兼容厂商预设：custom 的 base_url 由用户自己填
+# OpenAI兼容厂商预设：custom的base_url由用户自己填
 PROVIDER_CATALOG = {
     "deepseek": {
         "label": "DeepSeek",
@@ -45,19 +59,26 @@ PROVIDER_CATALOG = {
 }
 
 DEFAULT_ACTIVE = "deepseek"
-# 回退链只认 DeepSeek：.env 里目前只有 DEEPSEEK_* 三项
+#回退链只认DeepSeek：.env里目前只有DEEPSEEK_*三项
 ENV_FALLBACK_PROVIDER = "deepseek"
 
 
+# """
+#将磁盘位置绑定配置根目录；每次计算允许测试替换BASE_PATH，不在import时读密钥
+# """
 def settings_path() -> Path:
     """设置文件路径。每次读都重新算，方便测试 monkeypatch 到临时目录。"""
     return Path(config.BASE_PATH) / "data" / "llm_settings.json"
 
 
+# """
+# Pydantic数据边界：每厂商一份URL/模型/密钥，总设置保存当前厂商与档案映射
+# Field(default_factory=dict)避免跨实例共享可变字典；模型本身不执行网络校验
+# """
 class ProviderProfile(BaseModel):
     base_url: str = ""
     model: str = ""
-    # 明文 key 只在内存/磁盘里流转，绝不出现在任何响应中
+    #明文key只在内存/磁盘里流转，绝不出现在任何响应中
     api_key: str = ""
 
 
@@ -70,6 +91,9 @@ class LLMSettingsError(ValueError):
     """设置校验失败；message 直接给前端看，必须是人话。"""
 
 
+# """
+#仅生成展示掩码，按长度保护中间字符；掩码不构成加密存储或访问控制
+# """
 def mask_api_key(api_key: str | None) -> str:
     """把 key 掩码成 sk-5e1****c57e；空值回空串，长度不足时也至少遮住中间。"""
     key = (api_key or "").strip()
@@ -82,6 +106,9 @@ def mask_api_key(api_key: str | None) -> str:
     return key[:MASK_HEAD] + MASK_CHAR * 4 + key[-MASK_TAIL:]
 
 
+# """
+#识别面板掩码形状，用于保存时沿用旧值；后续仍须与已有密钥掩码精确比对
+# """
 def is_masked_api_key(api_key: str | None) -> bool:
     """判断前端回传的 key 是不是我们自己发出去的掩码串。
 
@@ -99,6 +126,9 @@ def is_masked_api_key(api_key: str | None) -> bool:
     return len(prefix) <= MASK_HEAD and len(suffix.lstrip(MASK_CHAR)) <= MASK_TAIL
 
 
+# """
+#根据厂商目录创建独立档案对象，供归一化补齐形状，api_key默认空值
+# """
 def default_profiles() -> dict[str, ProviderProfile]:
     return {
         name: ProviderProfile(
@@ -110,12 +140,15 @@ def default_profiles() -> dict[str, ProviderProfile]:
     }
 
 
+# """
+#写入前统一字段、补预设并过滤未知厂商；不读取环境密钥，避免把回退值意外写盘
+# """
 def _normalize(settings: LLMSettings) -> LLMSettings:
     """补齐缺失厂商、修正非法 active，保证读出来的形状总是完整的。"""
     profiles = default_profiles()
     for name, profile in (settings.profiles or {}).items():
         if name not in profiles:
-            # 未知厂商不静默保留，避免前端 select 出现空选项
+            #未知厂商不静默保留，避免前端select出现空选项
             continue
         merged = profiles[name]
         profiles[name] = ProviderProfile(
@@ -127,6 +160,9 @@ def _normalize(settings: LLMSettings) -> LLMSettings:
     return LLMSettings(active=active, profiles=profiles)
 
 
+# """
+#读取实际保存字段，不提前混入预设，以保留“已保存/需回退”的来源判断
+# """
 def load_settings() -> LLMSettings:
     """读取设置文件里**实际存下来的内容**（不掺预设默认值）。
 
@@ -159,6 +195,10 @@ def load_settings() -> LLMSettings:
     return LLMSettings(active=active, profiles=profiles)
 
 
+# """
+#归一化后在同目录写临时文件，flush/fsync后原子替换；异常尽力删除临时文件
+#原子替换避免半截文件，但读-改-写没有并发版本检测；凭据在磁盘仍为明文
+# """
 def save_settings(settings: LLMSettings) -> LLMSettings:
     """原子写入设置文件；父目录不存在就创建。"""
     normalized = _normalize(settings)
@@ -181,6 +221,9 @@ def save_settings(settings: LLMSettings) -> LLMSettings:
     return normalized
 
 
+# """
+#环境回退仅对DeepSeek开放；返回值仅供服务端解析，其他厂商空串继续走自身预设
+# """
 def env_api_key(provider: str | None = None) -> str:
     """`.env` 回退：目前只有 DeepSeek 三项，其它厂商没有 env 兜底。"""
     if (provider or DEFAULT_ACTIVE) != ENV_FALLBACK_PROVIDER:
@@ -188,18 +231,28 @@ def env_api_key(provider: str | None = None) -> str:
     return (config.DEEPSEEK_API_KEY or "").strip()
 
 
+# """
+#提取DeepSeek的环境地址，剔除首尾空白；不做URL可信性检查
+# """
 def env_base_url(provider: str | None = None) -> str:
     if (provider or DEFAULT_ACTIVE) != ENV_FALLBACK_PROVIDER:
         return ""
     return (config.DEEPSEEK_BASE_URL or "").strip()
 
 
+# """
+#提取DeepSeek环境模型名；空字段会由resolve_profile继续回退到厂商预设
+# """
 def env_model(provider: str | None = None) -> str:
     if (provider or DEFAULT_ACTIVE) != ENV_FALLBACK_PROVIDER:
         return ""
     return (config.DEEPSEEK_MODEL or "").strip()
 
 
+# """
+#合并生效配置：保存字段优先，缺项走环境再走预设；结果包含明文key，只供内部
+# provider省略使用active，注入settings可避免重复读取并方便离线测试
+# """
 def resolve_profile(provider: str | None = None, settings: LLMSettings | None = None) -> dict:
     """解析某个厂商最终生效的配置：设置文件优先，缺哪个字段才回退 .env。
 
@@ -210,7 +263,7 @@ def resolve_profile(provider: str | None = None, settings: LLMSettings | None = 
     name = provider or current.active
     if name not in PROVIDER_CATALOG:
         name = current.active
-    # 注意：这里不能拿 default_profiles() 当兜底，否则预设值会盖掉 .env 回退
+    #注意：这里不能拿default_profiles()当兜底，否则预设值会盖掉.env回退
     profile = current.profiles.get(name) or ProviderProfile()
 
     api_key = (profile.api_key or "").strip()
@@ -231,11 +284,17 @@ def resolve_profile(provider: str | None = None, settings: LLMSettings | None = 
     }
 
 
+# """
+#当前档案解析的便捷入口，调用时读取最新文件，不缓存旧的模型选择
+# """
 def active_config() -> dict:
     """ModelManager 每次请求都调这个，拿到的就是当前即时生效的配置。"""
     return resolve_profile()
 
 
+# """
+#只生成可读的缺密钥提示，不插入凭据值；厂商标签来自受控目录
+# """
 def missing_key_message(provider: str | None = None) -> str:
     label = PROVIDER_CATALOG.get(provider or "", {}).get("label", "当前厂商")
     return (
@@ -248,6 +307,9 @@ class NotConfiguredError(LLMSettingsError):
     """当前厂商没有可用 key；调用方应把它转成可读提示，而不是抛 401。"""
 
 
+# """
+#模型调用前最后一道非空检查，失败抛业务错误，成功返回内部生效配置
+# """
 def require_api_key() -> dict:
     """生成前调用：没 key 就抛 NotConfiguredError，让上层给出明确提示。"""
     resolved = active_config()
@@ -256,11 +318,17 @@ def require_api_key() -> dict:
     return resolved
 
 
+# """
+#为候选配置取已存或环境回退密钥；该函数本身不将key与端点绑定
+# """
 def _stored_api_key(provider: str) -> str:
     stored = load_settings().profiles.get(provider)
     return (stored.api_key if stored else "") or env_api_key(provider)
 
 
+# """
+#空输入沿用已存key；掩码必须匹配当前真实值才沿用，否则要求重新输入
+# """
 def resolve_api_key(provider: str, raw_key: str) -> str:
     """把草稿里的 key 归一化成明文。
 
@@ -280,6 +348,53 @@ def resolve_api_key(provider: str, raw_key: str) -> str:
     raise LLMSettingsError("API Key 不能填掩码值，请重新粘贴完整 Key（或留空沿用已保存的 Key）")
 
 
+# """
+#本地模型（如Ollama）确需私网/环回地址时，设环境变量LLM_ALLOW_PRIVATE_BASE_URL=1跳过拦截；
+#判定集中在allow_private_base_url()，保存端点也复用同一开关，避免两处口径不一致
+# """
+def allow_private_base_url() -> bool:
+    """是否允许 base_url 指向环回/私网（本地模型场景的显式逃生门）。"""
+    return os.environ.get("LLM_ALLOW_PRIVATE_BASE_URL") == "1"
+
+
+# """
+#拒绝环回/私网/链路本地/保留/组播/未指定地址，避免凭据随请求被转发到内网或本机端口
+#域名先经getaddrinfo解析再逐个检查；解析失败只告警放行（发不出请求，且测试/离线环境常见）
+# """
+def _assert_public_host(parsed) -> None:
+    """校验base_url的host不指向环回/私网/链路本地/保留地址。"""
+    host = parsed.hostname
+    if not host:
+        raise LLMSettingsError("base_url 缺少主机名")
+    try:
+        addresses = [ipaddress.ip_address(host)]
+    except ValueError:
+        try:
+            infos = socket.getaddrinfo(host, None)
+        except OSError:
+            print(f"[llm_settings] base_url主机名无法解析，跳过内网检查: {host}")
+            return
+        addresses = []
+        for info in infos:
+            try:
+                addresses.append(ipaddress.ip_address(info[4][0]))
+            except ValueError:
+                continue
+        if not addresses:
+            print(f"[llm_settings] base_url主机名没有可用IP地址，跳过内网检查: {host}")
+            return
+    if allow_private_base_url():
+        return
+    for addr in addresses:
+        if (addr.is_loopback or addr.is_private or addr.is_link_local
+                or addr.is_reserved or addr.is_multicast or addr.is_unspecified):
+            raise LLMSettingsError("base_url 不允许指向环回/私网/链路本地/保留地址，请使用公网接口地址（本地模型可设LLM_ALLOW_PRIVATE_BASE_URL=1）")
+
+
+# """
+#校验厂商、URL语法、模型非空并解析key；require_key=False允许保存未激活空档案
+# host经_assert_public_host拒绝环回/私网/链路本地/保留地址，缓解凭据转发/SSRF风险
+# """
 def validate_profile(provider: str, profile: dict, *, require_key: bool = True) -> ProviderProfile:
     """校验单个厂商配置，失败抛 LLMSettingsError（detail 直接给前端）。
 
@@ -298,6 +413,7 @@ def validate_profile(provider: str, profile: dict, *, require_key: bool = True) 
     parsed = urlparse(base_url)
     if parsed.scheme not in ("http", "https") or not parsed.netloc:
         raise LLMSettingsError("base_url 必须是 http(s):// 开头的合法地址")
+    _assert_public_host(parsed)
     if not model:
         raise LLMSettingsError("模型名称不能为空，请填写要调用的模型版本")
 
@@ -309,6 +425,37 @@ def validate_profile(provider: str, profile: dict, *, require_key: bool = True) 
     return ProviderProfile(base_url=base_url.rstrip("/") or base_url, model=model, api_key=api_key)
 
 
+# """
+# P0修复：把“凭据—地址绑定”下沉到保存路径本身。
+# 前端只改 base_url 不重输 key 时，resolve_api_key 会静默沿用旧 key，落盘后
+# 就变成“新地址 + 旧密钥”。这里在合并落盘前拦截：地址（归一化后）发生变化，
+# 而本次没有提交新的明文 key（留空或回传掩码），一律拒绝保存。
+# 归一化（大小写/末尾斜杠）差异不算地址变更，复用 CredentialPolicy 的同一规则。
+# """
+def _assert_key_binding_unchanged(provider: str, profile: dict) -> None:
+    """地址变更必须显式重输 API Key，防止已存密钥被转发到新端点。"""
+    if not isinstance(profile, dict):
+        return  #格式错误交给 validate_profile 统一报
+    candidate_url = str(profile.get("base_url") or "").strip()
+    if not candidate_url:
+        return  #缺地址同样交给 validate_profile
+    saved_url = str(resolve_profile(provider)["base_url"] or "")
+    if normalize_base_url(candidate_url) == normalize_base_url(saved_url):
+        return
+    raw_key = str(profile.get("api_key") or "").strip()
+    #空 key 与掩码都等于“沿用已保存的 key”，两者都不能跨地址搬运
+    carried = (not raw_key) or is_masked_api_key(raw_key)
+    if carried:
+        label = PROVIDER_CATALOG[provider]["label"]
+        raise LLMSettingsError(
+            f"修改「{label}」的 base_url 时必须重新填写并提交 API Key："
+            "不允许把已保存的 Key 转发到新地址"
+        )
+
+
+# """
+#读取旧档案→合并请求中的厂商→验证激活档案有key→一次原子保存；中途异常不写盘
+# """
 def apply_update(payload: dict) -> LLMSettings:
     """把前端提交的 {active, profiles} 合并进当前设置并原子落盘。
 
@@ -326,13 +473,17 @@ def apply_update(payload: dict) -> LLMSettings:
 
     merged = {name: profile.model_copy() for name, profile in current.profiles.items()}
     for name, profile in incoming.items():
+        if name not in PROVIDER_CATALOG:
+            raise LLMSettingsError(f"未知模型厂商: {name}")
+        #P0：先查“地址变了却没重输 key”，再走常规字段校验
+        _assert_key_binding_unchanged(name, profile)
         merged[name] = validate_profile(name, profile)
 
     active = str(payload.get("active") or current.active).strip()
     if active not in PROVIDER_CATALOG:
         raise LLMSettingsError(f"未知模型厂商: {active}")
 
-    # 切过去的厂商必须真的能用，否则用户切完只会拿到 401
+    #切过去的厂商必须真的能用，否则用户切完只会拿到401
     target = merged.get(active) or ProviderProfile()
     if not (target.api_key or env_api_key(active)):
         raise LLMSettingsError(
@@ -342,6 +493,9 @@ def apply_update(payload: dict) -> LLMSettings:
     return save_settings(LLMSettings(active=active, profiles=merged))
 
 
+# """
+#构建面板DTO：用掩码替代所有key，附生效模型/来源，避免内部解析对象直接序列化
+# """
 def settings_view() -> dict:
     """给前端看的设置视图：key 一律掩码，附带"当前是否已配置可用 key"。"""
     settings = load_settings()
@@ -355,7 +509,7 @@ def settings_view() -> dict:
             "base_url": stored.base_url or PROVIDER_CATALOG[name]["base_url"],
             "model": stored.model or PROVIDER_CATALOG[name]["model"],
             "model_placeholder": PROVIDER_CATALOG[name]["model"],
-            # 掩码只由明文算出；文件里没有 key 就掩码 .env 的 key，同样不回明文
+            #掩码只由明文算出；文件里没有key就掩码.env的key，同样不回明文
             "api_key": mask_api_key(stored.api_key or env_api_key(name)),
             "configured": bool(effective["api_key"]),
             "key_source": effective["key_source"],
@@ -371,6 +525,12 @@ def settings_view() -> dict:
         "key_source": resolved["key_source"],
         "base_url": resolved["base_url"],
         "model": resolved["model"],
-        # 未配置时的提示文案，前端直接显示，别再让用户对着 401 猜
+        #未配置时的提示文案，前端直接显示，别再让用户对着401猜
         "message": "" if resolved["api_key"] else missing_key_message(settings.active),
     }
+
+# [总审计 2026-11-13] P0 已修复：_assert_key_binding_unchanged（在 apply_update 校验循环内调用）
+# 在落盘前拒绝“base_url 变更但未提交新 Key”的请求，不允许把已保存/环境里的旧 Key
+# 拼到新地址上；归一化规则复用 CredentialPolicy.normalize_base_url。
+# P2 保留：_assert_public_host 在 DNS 解析失败时 print 后放行（fail-open），
+# 与该函数“拒绝环回/私网”的定位不一致；已在 allow_private_base_url 处收敛开关口径。

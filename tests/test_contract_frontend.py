@@ -101,27 +101,10 @@ def test_history_api_supports_mode_parameter():
     source = (STATIC_ROOT / "js" / "data" / "api" / "chat.js").read_text(encoding="utf-8")
 
     assert "getHistory: function(mode)" in source
-    assert "streamChat: async function(prompt, mode, taskMode, onEvent, signal)" in source
+    assert "streamChat: async function(prompt, mode, onEvent, signal)" in source
     assert "'/chat/stream_chat'" in source
     assert "'/chat/history'" in source
-    assert "'?mode='" in source
-
-
-def test_chat_api_carries_task_mode():
-    """任务轴（chat/work）要跟场景轴 mode 一起发到后端，否则落库与 /history 都拿不到"""
-    api_source = (STATIC_ROOT / "js" / "data" / "api" / "chat.js").read_text(encoding="utf-8")
-    core_source = (STATIC_ROOT / "js" / "service" / "chat.js").read_text(encoding="utf-8")
-    registry = (STATIC_ROOT / "js" / "data" / "registry.js").read_text(encoding="utf-8")
-
-    assert api_source.count("task_mode: taskMode == null ? null : String(taskMode)") == 2
-    # 发送时必须按 streamChat(prompt, mode, taskMode, onEvent, signal) 的顺序传参
-    assert "channel.getTaskMode ? channel.getTaskMode() : 'chat'" in core_source
-    assert "NGO.chatAPI.streamChat(text, mode, taskMode, function(event) {" in core_source
-    # 两个 channel 都要能给出任务轴；P5 才会提供 UI 去写 NGO.taskMode
-    assert registry.count("getTaskMode: function()") == 2
-    assert "NGO.taskMode" in registry
-    # 历史回填要读出每轮的 task_mode（P4 才按它分段渲染）
-    assert "item.task_mode" in core_source
+    assert "'mode=' + encodeURIComponent(mode)" in source
 
 
 def test_chat_core_sends_mode_and_consumes_sse_events():

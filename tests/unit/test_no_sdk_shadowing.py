@@ -12,6 +12,7 @@
 import json
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -52,16 +53,25 @@ def test_repo_packages_do_not_shadow_third_party_modules():
         "print(json.dumps(shadowed, ensure_ascii=False))\n"
         "raise SystemExit(1 if shadowed else 0)\n"
     )
-    result = subprocess.run(
-        [sys.executable, "-c", code],
-        capture_output=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=120,
-    )
+    # 不用 capture_output/PIPE：受限沙箱（Windows CreatePipe 被拒）里管道创建会直接失败，
+    # 而这里的验证只需要拿到子进程输出文本，重定向到临时文件即可，还避免了管道缓冲问题。
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        out_path = Path(tmp_dir) / "stdout.txt"
+        err_path = Path(tmp_dir) / "stderr.txt"
+        with out_path.open("w", encoding="utf-8", errors="replace") as out, err_path.open(
+            "w", encoding="utf-8", errors="replace"
+        ) as err:
+            result = subprocess.run(
+                [sys.executable, "-c", code],
+                stdout=out,
+                stderr=err,
+                timeout=120,
+            )
+        stdout = out_path.read_text(encoding="utf-8", errors="replace")
+        stderr = err_path.read_text(encoding="utf-8", errors="replace")
     assert result.returncode == 0, (
         "以下第三方模块被仓库内的同名包遮蔽了。任何把 app/ 放进 sys.path 的运行方式"
         "（例如 PyCharm 直接运行 app/main.py）都会因此崩溃：\n"
-        f"{result.stdout.strip()}\n--- stderr ---\n{result.stderr}"
+        f"{stdout.strip()}\n--- stderr ---\n{stderr}"
     )
-    assert json.loads(result.stdout.strip() or "{}") == {}
+    assert json.loads(stdout.strip() or "{}") == {}

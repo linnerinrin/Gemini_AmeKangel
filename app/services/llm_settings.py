@@ -439,8 +439,13 @@ def _assert_key_binding_unchanged(provider: str, profile: dict) -> None:
     candidate_url = str(profile.get("base_url") or "").strip()
     if not candidate_url:
         return  #缺地址同样交给 validate_profile
-    saved_url = str(resolve_profile(provider)["base_url"] or "")
+    saved = resolve_profile(provider)
+    saved_url = str(saved["base_url"] or "")
     if normalize_base_url(candidate_url) == normalize_base_url(saved_url):
+        return
+    #当前厂商根本没有已保存的 key（首次配置）：没有可搬运的凭据，
+    #交给 validate_profile 报“未配置 API Key”，不要误报成“已保存 Key 被转发”。
+    if not saved.get("api_key"):
         return
     raw_key = str(profile.get("api_key") or "").strip()
     #空 key 与掩码都等于“沿用已保存的 key”，两者都不能跨地址搬运

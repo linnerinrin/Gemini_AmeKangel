@@ -7,6 +7,7 @@ app/tools/registry.py 是唯一事实来源，本文件锁住它的对外形状�
 """
 import subprocess
 import sys
+import tempfile
 import types
 from pathlib import Path
 
@@ -135,15 +136,24 @@ def test_registry_and_adapters_do_not_pull_mcp():
         "print(','.join(bad))\n"
         "raise SystemExit(1 if bad else 0)\n"
     )
-    result = subprocess.run(
-        [sys.executable, "-c", code],
-        cwd=str(Path(__file__).resolve().parents[2]),
-        capture_output=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=60,
-    )
+    # 输出重定向到临时文件而不是 PIPE：受限沙箱可能禁止 CreatePipe，
+    # 而本测试只关心子进程退出码与 stdout 文本。
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        out_path = Path(tmp_dir) / "stdout.txt"
+        err_path = Path(tmp_dir) / "stderr.txt"
+        with out_path.open("w", encoding="utf-8", errors="replace") as out, err_path.open(
+            "w", encoding="utf-8", errors="replace"
+        ) as err:
+            result = subprocess.run(
+                [sys.executable, "-c", code],
+                cwd=str(Path(__file__).resolve().parents[2]),
+                stdout=out,
+                stderr=err,
+                timeout=60,
+            )
+        stdout = out_path.read_text(encoding="utf-8", errors="replace")
+        stderr = err_path.read_text(encoding="utf-8", errors="replace")
     assert result.returncode == 0, (
         "注册表/适配器不应拉入 MCP 依赖，实际拉入："
-        f"{result.stdout.strip()}\n--- stderr ---\n{result.stderr}"
+        f"{stdout.strip()}\n--- stderr ---\n{stderr}"
     )

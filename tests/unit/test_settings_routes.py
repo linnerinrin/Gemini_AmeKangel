@@ -87,6 +87,21 @@ def test_mask_replay_on_new_base_url_is_rejected(client, settings_env):
     assert "API Key" in response.json()["detail"]
 
 
+def test_first_time_base_url_without_key_reports_missing_key(client):
+    """首次配置某厂商（没有可搬运的旧 key）时，提示应是“未配置 API Key”，
+    而不是把地址变更误报成“已保存 Key 被转发”。"""
+    response = _post(
+        client,
+        {"openai": {"base_url": "https://api.openai.com/v1", "model": "gpt-4o-mini"}},
+        active="openai",
+    )
+
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert "未配置 API Key" in detail
+    assert "转发" not in detail
+
+
 # ═══════════════════════════════════════
 # 2. 显式重输 key 后可改地址；仅归一化差异不算改地址
 # ═══════════════════════════════════════

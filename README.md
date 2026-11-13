@@ -1,280 +1,174 @@
 # Gemini_AmeKangel · 双子角色扮演聊天系统
 
-基于大语言模型的双角色扮演聊天系统。糖糖（阴暗少女）与超天酱 / 堕天酱（元气主播）可在**私聊**与**直播**两种场景下切换，内置 RAG 知识库检索、查询改写、状态栏（好感 / 压力 / 心理）、思考链、表情协议，以及一套桌面式（Windows 98 风格）浏览器前端。
+基于大语言模型的角色扮演聊天系统。糖糖（ame）与超天酱 / 堕天酱（kangel / dangel）可在**私聊（JINE）**与**直播**两种场景下切换，内置 LangGraph 生成管线、RAG 检索、思考链、状态栏（好感 / 压力 / 心理 / 粉丝）、表情协议、MCP 工具出口，以及一套 Windows 98 风格的桌面式纯前端。
 
 ---
 
-## 目录
+## 1. 如何开始
 
-- [功能](#功能)
-- [运行环境](#运行环境)
-- [快速开始](#快速开始)
-- [模型配置](#模型配置)
-- [聊天模式与工作模式](#聊天模式与工作模式)
-- [MCP 工具出口](#mcp-工具出口)
-- [项目结构](#项目结构)
-- [接口一览](#接口一览)
-- [测试](#测试)
-- [仓库里没有的东西](#仓库里没有的东西)
-- [文档](#文档)
+### 环境要求
 
----
+- Windows + Python 3.10+
+- MySQL（启动时会自动建表与迁移）
+- GPU 可选（向量检索用 faiss-cpu，无 GPU 也能跑）
 
-## 功能
-
-| 模块 | 说明 |
-|---|---|
-| **双角色扮演** | 私聊（JINE，糖糖 / 雨）与直播（超天酱、堕天酱、糖糖）四个场景，各自独立系统提示词与知识库 |
-| **聊天 / 工作双模式** | 同一角色语境下切换任务轴：聊天模式专注角色扮演、按换行分段发送；工作模式面向技术任务、允许代码与 Markdown、整条不分段 |
-| **RAG 检索** | 向量召回（bi-encoder）+ 重排（cross-encoder），`retrieve_knowledge` / `retrieve_context` 两个工具；支持查询改写 `rewrite` |
-| **思考链** | 每个节点的思考、工具调用与审查结论都会实时推送到前端，并在该条回复内折叠展示；落库后历史回放可还原 |
-| **审查节点** | 回复生成后由独立节点审查，不通过则带着具体问题重写（次数上限见 `MAX_REFLECTION_TURNS`） |
-| **状态栏** | 好感 / 压力 / 心理 / 粉丝数，由模型通过 `change_status` 表达方向、系统按配置随机决定幅度，变化时有浮字动画 |
-| **表情协议** | `jine_pien_*` 系列表情代码，仅允许单独发送；前端按文本自动渲染为表情图片，历史旧数据的中文标签也能还原 |
-| **存档系统** | 3 个存档位，各自独立会话、短期记忆、长期记忆与状态栏 |
-| **桌面式前端** | 窗口拖拽、开始菜单、BGM / 音效、角色逐帧动画，纯原生 JS，无构建步骤 |
-
----
-
-## 运行环境
-
-- **Python 3.11**（开发环境 3.11.4）
-- **MySQL**（默认库名 `gemini`，启动时自动建表与迁移）
-- Windows（`start.bat` 与前端动画按 Windows 设计；其他平台可用 uvicorn 直接启动）
-- 一个 **OpenAI 兼容**的大模型接口（DeepSeek / OpenAI / 任意兼容网关）
-
-依赖见 [requirements.txt](requirements.txt)。其中 `unsloth` / `trl` / `datasets` 仅供 `utils/` 下的训练脚本使用，只跑服务可以不安。
-
----
-
-## 快速开始
+### 首次安装
 
 ```bat
-:: 1. 创建虚拟环境并安装依赖
 python -m venv venv
 venv\Scripts\python.exe -m pip install -r requirements.txt
-
-:: 2. 准备配置
-copy .env.example .env      :: 然后按需修改（MySQL 账号、路径等）
-
-:: 3. 准备本地模型（见"仓库里没有的东西"）
-
-:: 4. 启动
-start.bat
 ```
 
-启动后浏览器访问 <http://127.0.0.1:5577/>。
-
-也可以用参数换端口（原端口被占用时）：
+### 启动
 
 ```bat
-start.bat 6000
+start.bat            :: 默认端口 5577
+start.bat 5599       :: 端口被占用时指定其他端口
 ```
 
-或直接：
+启动后浏览器打开 <http://127.0.0.1:5577/>，按 `Ctrl+C` 停止服务。
 
-```bat
-venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 5577
-```
-
-> 接口文档：<http://127.0.0.1:5577/docs>
+常见问题：端口被占用就换个端口启动；MySQL 没启动会导致建表失败；模型 API Key 没配请在页面里的**控制面板**填好并点「测试」。
 
 ---
 
-## 模型配置
+## 2. 项目结构、核心文件与技术栈
 
-**源码里没有任何 API Key 或模型名的硬编码**，来源有两条，优先级从高到低：
+### 目录总览
 
-1. **控制面板（推荐）** —— 打开桌面上的「控制面板」，在「模型厂商 / 模型版本 / API Key」处填写并保存，数据写入 `data/llm_settings.json`。
-   - 内置厂商预设：`DeepSeek`、`OpenAI`、`custom`（自己填 `base_url`）
-   - **保存后下一个请求即生效，无需重启**
-   - 「测试」按钮会发一次最小请求验证连通性
-   - 界面上 API Key 只显示掩码（如 `sk-5e1b****c57e`），明文永不回传
-2. **`.env`** —— 未使用控制面板时的回退来源：
-   ```
-   DEEPSEEK_MODEL=deepseek-v4-flash
-   DEEPSEEK_BASE_URL=https://api.deepseek.com
-   DEEPSEEK_API_KEY=sk-...
-   ```
+```
+Gemini_AmeKangel/
+├─ start.bat            # Windows 一键启动脚本（uvicorn app.main:app）
+├─ requirements.txt     # Python 依赖
+├─ contracts/           # 前后端契约（api_contract.json、角色 idx 映射）
+├─ prompts/             # 提示词：base / role(ame,kangel,dangel,ame_live) / task(chat) / 知识库
+├─ repository/          # 数据层：conn.py（连接池）、init_db.py（建表）
+├─ static/              # 前端：boot.html / desktop.html / css / js / assets（角色逐帧素材）
+├─ tests/               # pytest 单测与集成测试 + Node .cjs 前端契约测试
+└─ app/                 # 后端主体（FastAPI）
+   ├─ main.py           # 装配：静态目录、/chat 路由、/mcp 挂载、lifespan
+   ├─ config/           # config.py（全部配置项）、status_rules.py（状态随机规则）、
+   │                    #   llm_import.py（按文件加载避免测试遮蔽）、schema.py（幂等迁移）
+   ├─ api/chat/         # chat_routes.py（聊天路由）、settings_routes.py（模型设置路由）、
+   │                    #   *_schemas.py（请求边界）、generation_lock.py（生成互斥）
+   ├─ services/         # chat_session.py（单会话运行时）、llm_settings.py（设置读写与校验）、
+   │                    #   __init__.py（会话注册表+门面 ChatFacade）
+   ├─ managers/         # GraphManager（LangGraph 管线）、MemoryManager（记忆与状态落库）、
+   │                    #   ModelManager（模型调用）、RAGManager（向量检索+重排）、
+   │                    #   FuncCallManager（工具执行）、AccountManager（3 个存档位）
+   ├─ tools/            # registry.py（工具唯一来源：7 核心 + 4 只读 + MCP 外部工具）、adapters/
+   ├─ mcp_server/       # server.py：把 registry 的 external 工具暴露为 MCP Server
+   └─ agent_framework/  # contracts.py（端口契约）、model_adapter（OpenAI 兼容 HTTP 客户端）、
+                        #   mcp_client（stdio MCP 客户端+工具桥）、readonly（文件只读工具+PathGuard）、
+                        #   context_budget（token 计数与会话窗口）、security（审计/出站校验/凭据策略/会话注册表）
+```
 
-若两者都没有配置，界面会明确提示「尚未配置 API Key」，而不是抛出难以理解的 401。
+### 核心后端文件作用
 
-**每轮对话都会记录实际使用的厂商与模型**（`chat.llm_provider` / `chat.llm_model`），方便排查同一存档里风格变化的原因。
+| 文件 | 作用 |
+|---|---|
+| `app/main.py` | FastAPI 装配：挂 `/static`、`/chat` 两组路由、`/mcp` 的 StreamableHTTP 入口，驱动 MCP lifespan |
+| `app/services/chat_session.py` | 单个存档的运行时：装配系统提示词、跑生成管线、写记忆、结算状态与涨粉 |
+| `app/services/__init__.py` | 会话注册表 + `ChatFacade` 门面；`resolve_current()` 在 await 前锁定会话快照，防止换绑串档 |
+| `app/services/llm_settings.py` | 模型设置的读写、掩码、校验；凭据-地址绑定（改 base_url 必须重填 key），出站地址校验 |
+| `app/managers/GraphManager.py` | LangGraph 生成管线：检索 → 生成 → 审查 → （不通过则带问题重写），全程推送思考链事件 |
+| `app/managers/MemoryManager.py` | 短期/长期记忆、状态栏（好感/压力/心理/粉丝）落库；直播模式每轮按概率涨粉 |
+| `app/managers/ModelManager.py` | 模型统一入口：OpenAI 兼容协议、超时/重试、参数透传（top_p/max_tokens 按 >0 条件携带） |
+| `app/managers/RAGManager.py` | RAG：bi-encoder 向量召回（faiss）+ cross-encoder 重排，本地模型目录离线加载 |
+| `app/managers/FuncCallManager.py` | 工具执行调度；只读文件工具的读取边界由 `READONLY_ROOTS` 决定 |
+| `app/tools/registry.py` | 工具唯一事实来源：schema、执行闭包、scope；同一份定义喂给模型、LangGraph 与 MCP |
+| `app/mcp_server/server.py` | 把 5 个无状态工具（output_time / retrieve_knowledge / retrieve_context / rewrite / search_web）暴露为 MCP Server，schema 直接取自注册表 |
+| `app/agent_framework/model_adapter/` | OpenAI 兼容 HTTP 客户端（httpx），任何 OpenAI 兼容端点都可接入 |
+| `app/agent_framework/security/` | 审计事件、出站地址校验（SSRF 防护）、凭据策略、每会话锁注册表 |
+| `repository/conn.py` | MySQL 连接与事务边界 |
+| `repository/init_db.py` | 启动建表；老库由 `app/config/schema.py` 幂等迁移 |
+
+### 技术栈
+
+- **后端**：FastAPI + Uvicorn、Pydantic v2 / pydantic-settings、PyMySQL（MySQL）
+- **生成管线**：LangGraph + langchain-core
+- **RAG**：sentence-transformers（bi-encoder + cross-encoder）、faiss-cpu、HuggingFace 本地模型
+- **模型接入**：OpenAI 兼容协议（httpx），支持 deepseek / openai / custom 等厂商
+- **工具协议**：MCP（Server 出口 + stdio 客户端入口）
+- **其他**：tiktoken（token 计数）、ddgs（联网搜索）、torch / transformers（本地推理依赖）
+- **前端**：纯原生 HTML/CSS/JS，无构建步骤；SSE 流式渲染、逐帧角色动画
+- **测试**：pytest（单元+集成）、Node .cjs（前端契约测试）
 
 ---
 
-## 聊天模式与工作模式
+## 3. 可用 API 一览
 
-两条**正交**的轴：
+HTTP 接口统一挂在 `/chat` 前缀下（FastAPI，端口见启动参数）。
 
-| 轴 | 取值 | 决定 |
+### 聊天与存档
+
+| 方法与路径 | 说明 | 请求体 |
 |---|---|---|
-| 场景轴 `mode` | `0` 糖糖私聊 / `1` 超天酱直播 / `2` 堕天酱直播 / `3` 糖糖直播 | 角色人设、知识库、直播主题 |
-| 任务轴 `task_mode` | `chat` / `work` | 输出纪律、是否分段、审查规则 |
+| `POST /chat/single_chat` | 单轮生成，等待完整结果 | `{prompt, session_id?, mode?}` |
+| `POST /chat/stream_chat` | 流式生成（SSE），实时推送思考链与分段回复 | `{prompt, session_id?, mode?}` |
+| `GET /chat/history` | 读取历史；带 `mode` 参数按场景读取 | `?mode=&session_id=` |
+| `POST /chat/mode_change` | 切换场景（JINE / 各直播档） | `{mode, session_id?}` |
+| `POST /chat/get_status` | 读取状态栏（好感/压力/心理/粉丝） | `{session_id?}` |
+| `GET /chat/sessions` | 存档列表（共 3 个槽位） | — |
+| `POST /chat/new_session` | 新建存档并绑定 | `{session_num}` |
+| `POST /chat/chose_session` | 选择已有存档 | `{session_num}` |
+| `POST /chat/delete_session` | 删除存档 | `{session_num}` |
+| `POST /chat/start_session` | 绑定指定存档为活动会话 | `{session_id}` |
 
-最终提示词按 `base + role/{mode} + task/{task_mode}` 拼接：
+### 模型设置（控制面板）
 
-- `prompts/base.txt` —— 跨角色跨任务共用的正文边界
-- `prompts/role/*.txt` —— 四个角色的人设与示例
-- `prompts/task/chat.txt` / `task/work.txt` —— 两种任务的纪律
+| 方法与路径 | 说明 |
+|---|---|
+| `GET /chat/settings/llm` | 读取设置视图（active 厂商、各厂商 base_url/model、掩码 key） |
+| `POST /chat/settings/llm` | 保存设置并切换 active；改 base_url 必须重填 key；生成中禁止修改 |
+| `POST /chat/settings/llm/test` | 连通性探测：key/base_url/model 可覆盖，留空沿用已保存值 |
 
-**聊天模式**（默认）：
+### MCP 工具出口
 
-- 严格禁止输出工作类内容（代码、脚本、技术方案、长篇结构化文档）
-- 用户问报错或技术问题时，可以简短解释原因与思路，但**不给完整代码块**，并提示切换到工作模式
-- 保留 `jine_pien_*` 表情协议
-- **按换行分段发送**：模型输出的每个换行都会被当作"另发一条消息"
-  - 私聊：每段是独立的「头像 + 气泡」
-  - 直播：弹幕区逐条追加，左侧字幕逐段切换
-  - **段与段之间至少间隔 1 秒**才开始显示下一段；输入框会一直锁到最后一段出现
-  - 历史回放同样按换行分段，但**一次性铺开、不加延时**
-  - 代码围栏（三个反引号包起来的块）内的换行**不会**触发分段，防止代码被拆碎
-
-**工作模式**：
-
-- 面向技术问题、代码、文档、资料整理
-- 允许并鼓励 Markdown、代码块、列表、表格、英文标识符与命令
-- **不按换行分段**，回复始终作为一条消息，换行与缩进原样保留
-- 使用独立的工作版审查规则（放行代码块，仍拦截泄露私密推理）
-
-每轮的 `task_mode` 会写入 `chat` 表并随 `/chat/history` 返回，因此前端能对历史正确渲染（聊天模式的历史拆成多条，工作模式的保持整条）。前端开关在控制面板的「对话模式」，选择结果保存在浏览器 `localStorage`。
+- 挂载点：`/mcp`（StreamableHTTP）；stdio 直连：`python -m app.mcp_server.server`
+- 暴露的 5 个无状态工具：`output_time`、`retrieve_knowledge`、`retrieve_context`、`rewrite`、`search_web`
+- 其余：`GET /` 返回前端入口页；`/static/*` 为静态资源
 
 ---
 
-## MCP 工具出口
+## 4. 工作流：配置 API Key → JINE → 直播
 
-本项目的工具以 [Model Context Protocol](https://modelcontextprotocol.io) 对外暴露，其他模型 / 客户端可以直接接入。工具的**名称、描述、参数 Schema 只有一份定义**（`app/tools/registry.py`），同时派生给模型载荷、LangGraph 执行体与 MCP 三个出口。
+### ① 配置 API Key
 
-对外只暴露 **5 个无状态工具**：
+1. 启动服务后打开页面，进入**控制面板**（设置页）。
+2. 选择厂商（deepseek / openai / custom 等 OpenAI 兼容端点），填入 `base_url`、`model`、`API Key`，点「测试」确认连通，再保存。
+3. 设置持久化在 `data/llm_settings.json`；响应里只回传掩码 key，永不回传明文。
+4. 安全规则：改 `base_url` 必须重新填写 key（防止已保存凭据被转发到新地址）；默认拒绝回环/内网地址，自建本地推理服务时设 `LLM_ALLOW_PRIVATE_BASE_URL=1`。
 
-`output_time`、`retrieve_knowledge`、`retrieve_context`、`rewrite`、`search_web`
+### ② JINE 私聊（mode 0）
 
-> `save_memory` 与 `change_status` 依赖「当前存档」这一进程内状态，**不对外暴露**，避免外部调用误改你正在玩的存档。
+- 角色为**糖糖 / 雨（ame）**，桌面上的 JINE 窗口即私聊界面。
+- 回复按换行分段发送；支持 `jine_pien_*` 表情协议（单独成条发送，前端渲染为表情图）。
+- 状态栏由模型通过 `change_status` 工具表达方向，系统按概率与步长随机决定幅度；好感度决定立绘差分（`_dark/_low/_high/_peak`），压力决定待机动画。
+- 长期记忆、短期记忆与状态栏都按存档独立持久化在 MySQL。
 
-**stdio**（本地客户端直连）：
+### ③ 直播（mode 1/2/3）
 
-```bat
-venv\Scripts\python.exe -m app.mcp_server.server
-```
+- 三个直播档：**超天酱（kangel）、堕天酱（dangel）、糖糖直播（ame_live）**，各有独立角色提示词与知识库。
+- 直播窗口为弹幕/观众语境；ame_live 复用状态动画素材，同样随好感/压力换帧。
+- **涨粉**：直播档每轮生成成功后按概率涨粉（默认 50% 概率涨 1~30），私聊不涨；粉丝数无上限，越过 1000 / 1万 / 10万 / 100万 时主播自觉提示词自动升级。
+  - 调参（`.env`）：`FOLLOWERS_GROW_PROBABILITY`、`FOLLOWERS_GROW_MIN_STEP`、`FOLLOWERS_GROW_MAX_STEP`
 
-**HTTP**（其他机器 / 模型经网络接入）：应用启动后即挂载在 `/mcp`。
-
-```bat
-venv\Scripts\python.exe -m app.mcp_server.server --transport streamable-http --host 0.0.0.0 --port 8931
-```
-
-> ⚠️ `/mcp` **目前没有认证**，任何能访问该端口的人都能调用这 5 个工具。若要暴露到公网，请自行加反向代理与鉴权。
-
-详细用法见 [docs/mcp-server.md](docs/mcp-server.md)。
-
----
-
-## 项目结构
+### 生成管线（每轮消息的内部旅程）
 
 ```
-app/
-├── main.py                 # FastAPI 入口（装配路由、挂载 /mcp、lifespan 内建表迁移）
-├── api/chat/               # 聊天与会话路由 + 设置路由 + 生成互斥锁
-├── config/                 # 配置、提示词装配、表结构迁移
-├── managers/               # 模型 / RAG / 记忆 / 工具 / 图 五个管理器
-├── services/               # 会话编排（ChatSession）、模型设置服务
-├── tools/                  # 工具唯一注册表 + OpenAI / LangGraph 适配器
-└── mcp_server/             # MCP Server（stdio 与 HTTP 两种传输）
-repository/                 # MySQL 连接与建表
-prompts/                    # 基础 / 角色 / 任务提示词
-static/                     # 前端（原生 JS，无构建）
-tests/                      # pytest + 前端行为测试（*_behavior.cjs）
-contracts/                  # 前后端接口契约（契约测试消费）
-docs/                       # 设计文档
-utils/                      # 训练与数据处理脚本
-start.bat                   # Windows 启动脚本
+用户消息 → 路由绑定会话快照 → GraphManager(LangGraph)
+  → RAG 检索 + 工具调用（思考链实时推送到前端）
+  → 生成回复 → 审查节点（不通过则带问题重写，上限 MAX_REFLECTION_TURNS）
+  → SSE 分段推送 / 整段返回
+  → MemoryManager 落库（历史+记忆+状态）→ 直播档结算涨粉
 ```
-
-### 对话编排（LangGraph）
-
-```
-START → agent（决策 / 工具调用）
-          ├─ 需要工具 → tools → agent   （轮次上限 MAX_TOOL_TURNS）
-          └─ 不需工具 → generate_reply（生成正文）
-                          → reflection（审查）
-                              ├─ 通过 → END
-                              └─ 退回 → generate_reply（带具体问题重写）
-```
-
-三个节点各自读取会话上按 `(mode, task_mode)` 重算好的提示词，因此新增任务模式无需改动图结构。
-
----
-
-## 接口一览
-
-前缀 `/chat`，另有 `/mcp` 与 `/docs`。
-
-| 方法 | 路径 | 说明 |
-|---|---|---|
-| POST | `/chat/start_session` | 绑定存档 |
-| POST | `/chat/new_session` / `chose_session` / `delete_session` | 存档增删选 |
-| GET | `/chat/sessions` | 存档列表 |
-| GET | `/chat/history?mode=&session_id=` | 历史（每行含 `task_mode` / `llm_provider` / `llm_model`） |
-| POST | `/chat/single_chat` | 非流式对话（body 带 `session_id`） |
-| POST | `/chat/stream_chat` | **流式对话（SSE）**（body 带 `session_id`） |
-| POST | `/chat/mode_change` | 切换场景轴（body 带 `session_id`） |
-| POST | `/chat/get_status` | 读取状态栏（body 带 `session_id`） |
-
-会话类接口按请求显式声明 `session_id`，路由入口绑定对应存档，不信任全局绑定；换绑仅在生成空闲时进行，生成中请求其他会话会 409。
-| GET / POST | `/chat/settings/llm` | 读取 / 保存模型设置（Key 只回掩码） |
-| POST | `/chat/settings/llm/test` | 模型连通性测试 |
-
-生成期间会拒绝切换存档 / 模式 / 模型（返回 409），避免中途串档。
 
 ---
 
 ## 测试
 
 ```bat
-venv\Scripts\python.exe -m pytest -q
+venv\Scripts\python.exe -m pytest tests/unit tests/integration tests/test_contract_backend.py tests/test_stream_behavior.py -q
+for %f in (tests\*.cjs) do node %f
 ```
-
-当前：**259 passed**。
-
-- `tests/unit/` —— 各管理器、配置、迁移、工具注册表、MCP Server 的单元测试
-- `tests/integration/` —— 路由与对话流程（含契约驱动）
-- `tests/*_behavior.cjs` —— 前端行为测试，由 `pytest` 自动通过 node 子进程执行，覆盖分段渲染、字幕、思考链、控制面板、状态浮字、动画帧等
-- `tests/manual_chat_flow.py` —— 手动跑通整条图链路（含真实 langchain 工具执行）
-
----
-
-## 仓库里没有的东西
-
-以下内容因体积或机密原因**不在仓库中**，clone 后需要自行准备，否则服务无法启动：
-
-| 缺失内容 | 说明 | 如何准备 |
-|---|---|---|
-| `models/all-MiniLM-L6-v2/` | RAG 向量召回模型 | 从 HuggingFace 下载后放到该目录 |
-| `models/ms-marco-MiniLM-L-6-v2/` | RAG 重排模型 | 同上 |
-| `static/assets/audio/` | BGM 与音效（部分 wav 超过 GitHub 单文件 100MB 上限） | 自行放入 |
-| `.env` | 内含 MySQL 密码、`JWT_SECRET`、SMTP 密码 | 由 `.env.example` 复制修改 |
-| `data/llm_settings.json` | 控制面板保存的模型设置（含 API Key） | 启动后在控制面板填写 |
-| `models/qwen2.5/` | 仅训练脚本需要，运行服务不需要 | 可选 |
-
-路径由 `.env` 的 `BI_ENCODER_PATH` / `CROSS_ENCODER_PATH` 指定。
-
----
-
-## 文档
-
-- [改造方案与决策记录](docs/plan-chat-work-mode-mcp-llm.md) —— 双模式、MCP、模型设置的设计与取舍，含已知问题与后续项
-- [MCP Server 使用说明](docs/mcp-server.md) —— 两种传输的接法、工具清单、Schema 保真做法
-
----
-
-## 已知限制
-
-- `/mcp` 无认证，暴露到公网前必须自行加鉴权
-- 会话状态为**进程内全局单例**，多客户端同时使用会互相串档；生成期间的切换虽有互斥保护，但跨客户端隔离尚未实现
-- 状态类工具（`change_status`）在审查通过前即写入数据库，审查失败时状态变更不回滚
-- 长期记忆与 RAG 上下文**不按任务轴隔离**（仅短期记忆按 `mode + task_mode` 隔离）
-- 聊天模式的换行分段依赖提示词约束模型「一条消息内部不换行」；模型若为排版换行，仍可能出现一条话被拆成两条气泡
-
-<!-- [总审计 2026-11-13] P1：:113-140、:204、:217、:275 等段落的 task_mode/work 模式在工作树中已被整体移除
-（config.py/prompts/chat 表/前端控制面板/契约均无该轴），本文件描述已失真；另 F1-F8 未标记“已接入/未做”。
-以代码与 contracts/api_contract.json 为准，待产品拍板是否恢复 work 轴后统一修订。 -->

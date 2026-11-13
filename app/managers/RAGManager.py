@@ -38,7 +38,8 @@ class RAGManager(IRAG):
         self.bi_encoder=RAGManager._shared_bi_encoder
         #双编码器用于rerank（同上，共享权重）
         if RAGManager._shared_cross_encoder is None:
-            RAGManager._shared_cross_encoder=CrossEncoder(model_name=config.cross_encoder_dir).to(config.RAG_DEVICE)
+            #sentence-transformers 5.x：model_name 参数已更名，旧名会告警
+            RAGManager._shared_cross_encoder=CrossEncoder(model_name_or_path=config.cross_encoder_dir).to(config.RAG_DEVICE)
         self.cross_encoder=RAGManager._shared_cross_encoder
 
         #当前场景轴由load_mode显式落定；未加载前为None，避免update_context读不到属性

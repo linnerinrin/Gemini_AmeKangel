@@ -8,6 +8,8 @@
 function playFrames(config) {
   if (!config.frames || !config.frames.length || !config.el) return;
   if (config._state.timer) { clearInterval(config._state.timer); config._state.timer = null; }
+  // 记录实际在播的帧键：状态轮询算出同一组帧时不必重播（否则 idle 会被无意义地抽一下）
+  config._state.currentKey = config.key || config._state.currentKey;
 
   var fps = config.fps || 300;
   var i = 0;
@@ -56,12 +58,17 @@ function createCharAnim(cfg) {
 
     var suffix = cfg.getSuffix();
     var key = suffix ? actionName + suffix : actionName;
+    var framesKey = key;
     var frames = framesObj[key] || framesObj[actionName];
+    if (!framesObj[key] && framesObj[actionName]) framesKey = actionName;
 
     var idleAction = (am && am.idle) || 'idle';
     if (!frames) {
       var fallback = cfg.getIdle ? cfg.getIdle() : idleAction;
-      frames = framesObj[fallback + suffix] || framesObj[fallback] || framesObj[idleAction];
+      var fallbackKey = suffix ? fallback + suffix : fallback;
+      frames = framesObj[fallbackKey] || framesObj[fallback] || framesObj[idleAction];
+      framesKey = framesObj[fallbackKey] ? fallbackKey
+                : (framesObj[fallback] ? fallback : idleAction);
       // 后缀回退（_dark/_high 等只画了 idle/talk）属于设计内行为；只有连基名都取不到、
       // 动作被静默降级成 idle 时才提示，便于发现帧表漏登记（liveAmeFrames 曾缺 smile）。
       // start 是 start() 的可选探测动作，用 optional 标记豁免。
@@ -77,6 +84,7 @@ function createCharAnim(cfg) {
 
     return {
       frames: frames,
+      key: framesKey,
       path: cfg.path,
       el: document.getElementById(cfg.elId),
       fps: 300,
@@ -108,6 +116,8 @@ function createCharAnim(cfg) {
     if (action === 'idle' && cfg.getIdle) action = cfg.getIdle();
     var fc = _build(action, opts);
     if (!fc.frames) return;
+    // 同一组帧已经在循环播放：数值变了但档位没变时不打断重播（避免 idle 无故抽一下）
+    if (!fc.oneshot && fc.key === state.currentKey && state.timer) return;
     playFrames(fc);
   }
 

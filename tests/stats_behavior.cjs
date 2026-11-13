@@ -50,12 +50,29 @@ NGO.status = null;
 assert.equal(ame.getIdle(), 'idle_happy');
 assert.equal(ame.getSuffix(), '');
 
-// 直播角色不参与状态映射
-for (const name of ['kangel', 'dangel', 'ame-live']) {
+// 直播 ame 复用私聊的状态待机映射（同一素材目录），阈值应与 ame 完全一致
+const ameLive = ctx.charConfigs['ame-live'];
+for (const [stress, expected] of [
+  [0, 'idle_happy'], [39, 'idle_happy'], [40, 'idle_normal'], [59, 'idle_normal'],
+  [60, 'idle_anxiety'], [79, 'idle_anxiety'], [80, 'idle_iraira'], [100, 'idle_iraira'],
+]) {
+  NGO.status = { stress: stress, affection: 50 };
+  assert.equal(ameLive.getIdle(), expected, `ame-live stress=${stress} 的 idle`);
+}
+for (const [aff, expected] of [
+  [0, '_dark'], [19, '_dark'], [20, '_low'], [39, '_low'], [40, ''],
+  [79, ''], [80, '_high'], [99, '_high'], [100, '_peak'], [140, '_peak'],
+]) {
+  NGO.status = { stress: 50, affection: aff };
+  assert.equal(ameLive.getSuffix(), expected, `ame-live affection=${aff} 的后缀`);
+}
+
+// kangel / dangel 只有基础待机帧，不参与状态映射
+for (const name of ['kangel', 'dangel']) {
   const cfg = ctx.charConfigs[name];
   NGO.status = { stress: 100, affection: 0 };
   assert.equal(cfg.getIdle(), 'idle', `${name} 的 idle 应恒为 idle`);
   assert.equal(cfg.getSuffix(), '', `${name} 的后缀应恒为空`);
 }
 
-console.log('stats behavior passed: 0 值兜底、好感/压力阈值边界、缺省回退与直播隔离');
+console.log('stats behavior passed: 0 值兜底、好感/压力阈值边界、缺省回退、直播 ame 状态映射与 kangel/dangel 隔离');

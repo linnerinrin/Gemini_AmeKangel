@@ -31,4 +31,6 @@ tmp1lzwt97u/
 .env
 .env.*
 !.env.example
-data/
+# 只忽略仓库根目录的运行时数据目录；static/js/data 是前端数据层，必须入库
+/data/
+/data-gym-cache/

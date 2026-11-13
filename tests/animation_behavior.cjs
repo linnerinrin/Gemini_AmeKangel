@@ -16,5 +16,12 @@ anim.playAction('smile'); assert.match(el.src,/t[12]\.png$/);
 anim.setThinking(false); assert.equal(el.src,'/idle.png');
 anim.playAction('smile');tick();assert.equal(el.src,'/idle.png');
 anim.playAction('think',{loop:true});for(let n=0;n<8;n++){tick();assert.match(el.src,/t[12]\.png$/);}
+// 状态轮询算出同一组 idle 帧时不应重启播放（否则每次轮询都抽一下）
+anim.setThinking(false);
+el.src = '/sentinel.png';
+anim.playAction('idle');
+assert.equal(el.src, '/sentinel.png', 'same idle key must not restart playback');
+tick();
+assert.equal(el.src, '/idle.png', 'idle timer still alive after skip');
 anim.stop();assert.equal(timers.size,0);
 console.log('Animation behavior passed: sustained thinking, click guard, release and transient recovery');

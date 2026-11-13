@@ -15,7 +15,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-# ---- mock heavy dependencies before any app imports ----
+#---- mock heavy dependencies before any app imports ----
 class PlaceholderDB:
     def __call__(self, *args, **kwargs): return None
     def commit(self): return None
@@ -28,7 +28,7 @@ repo_conn.db = PlaceholderDB()
 sys.modules.setdefault("repository", repo_mod)
 sys.modules.setdefault("repository.conn", repo_conn)
 
-# ---- load source modules directly (skips app/managers/__init__.py) ----
+#---- load source modules directly (skips app/managers/__init__.py) ----
 def load_source(module_name, rel_path):
     path = PROJECT_ROOT / rel_path
     spec = importlib.util.spec_from_file_location(module_name, path)
@@ -71,13 +71,13 @@ class MockRAG:
 
 
 async def main():
-    # Model output sequence (4 calls for a full cycle):
-    #  1. agent_node (use_tools=True)  -> thinking + calls output_time
-    #  2. agent_node (use_tools=True)  -> thinking + no tool_calls
-    #  3. generate_reply_node          -> final reply
-    #  4. reflection_node              -> __ACCEPT__
-    # reflection_node 只接受 finish_reason == "stop" 的完整审查结果，
-    # 所以桩输出必须带 finish_reason（默认 None 会被当成"截断/格式异常"而重试）
+    #Model output sequence (4 calls for a full cycle):
+    #1. agent_node (use_tools=True)  -> thinking + calls output_time
+    #2. agent_node (use_tools=True)  -> thinking + no tool_calls
+    #3. generate_reply_node          -> final reply
+    #4. reflection_node              -> __ACCEPT__
+    #reflection_node只接受finish_reason == "stop"的完整审查结果，
+    #所以桩输出必须带finish_reason（默认None会被当成"截断/格式异常"而重试）
     model = MockModel([
         GenerationResult(content="用户想知道时间，调用output_time。", finish_reason="stop", tool_calls=[
             {"name": "output_time", "args": {}, "id": "call_1", "type": "tool_call"},
@@ -87,10 +87,10 @@ async def main():
         GenerationResult(content="__ACCEPT__", finish_reason="stop", tool_calls=[]),
     ])
 
-    # FunctionCallManager with real tools
+    #FunctionCallManager with real tools
     fcall = FunctionCallManager()
     fcall.init(rag_mgr=MockRAG(), memory_mgr=MockMemory(), model_mgr=MockModel([]))
-    fcall.memory_mgr = MockMemory()  # ensure change_status has a live mock
+    fcall.memory_mgr = MockMemory()  #ensure change_status has a live mock
 
     session = types.SimpleNamespace(
         current_mode="0",
@@ -137,7 +137,7 @@ async def main():
     print(f"  reflection_finish:  {result.get('reflection_finish')}")
     print()
 
-    # Verify
+    #Verify
     assert result.get("reply"), "Reply should not be empty"
     assert result["reply"] == "现在是2026年6月9日。"
     assert result["tool_turns"] == 2

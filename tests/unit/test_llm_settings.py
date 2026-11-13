@@ -1,6 +1,6 @@
-"""P5a：模型设置（读写/掩码/校验/.env 回退）+ ModelManager 实时替换
+"""模型设置（读写/掩码/校验/.env回退）+ ModelManager实时替换
 
-关键断言：任何接口响应都不得出现明文 key。
+关键断言：任何接口响应都不得出现明文key。
 """
 
 import asyncio
@@ -18,15 +18,15 @@ from app.config.llm_import import load_llm_settings
 PLAINTEXT_KEY = "sk-p5a-1234567890abcdef-SECRET"
 
 
-# ═══════════════════════════════════════
-# 通用夹具：把设置文件指到临时目录
-# ═══════════════════════════════════════
+#═══════════════════════════════════════
+#通用夹具：把设置文件指到临时目录
+#═══════════════════════════════════════
 
 @pytest.fixture
 def settings_env(tmp_path, monkeypatch):
-    """llm_settings.settings_path() 指向 tmp_path/data/llm_settings.json。
+    """llm_settings.settings_path()指向tmp_path/data/llm_settings.json。
 
-    用与生产代码同一个加载器，保证与 settings_routes 用的是同一份模块对象。
+    用与生产代码同一个加载器，保证与settings_routes用的是同一份模块对象。
     """
     llm_settings = load_llm_settings()
     monkeypatch.setattr(llm_settings, "settings_path", lambda: tmp_path / "data" / "llm_settings.json")
@@ -35,21 +35,21 @@ def settings_env(tmp_path, monkeypatch):
 
 @pytest.fixture
 def client(fake_services, settings_env):
-    """复用 conftest 的假服务夹具（避免 import 真实模型），并带上设置路由。"""
+    """复用conftest的假服务夹具（避免import真实模型），并带上设置路由。"""
     import importlib
     module = importlib.import_module("app.main")
     return TestClient(module.app)
 
 
 def assert_no_plaintext(payload) -> None:
-    """任何响应体都不能含明文 key。"""
+    """任何响应体都不能含明文key。"""
     text = payload if isinstance(payload, str) else json.dumps(payload, ensure_ascii=False)
     assert PLAINTEXT_KEY not in text
 
 
-# ═══════════════════════════════════════
-# 1. 设置读写与掩码
-# ═══════════════════════════════════════
+#═══════════════════════════════════════
+#1.设置读写与掩码
+#═══════════════════════════════════════
 
 def test_default_settings_fall_back_to_provider_presets(settings_env):
     view = settings_env.settings_view()
@@ -58,7 +58,7 @@ def test_default_settings_fall_back_to_provider_presets(settings_env):
     assert set(view["profiles"]) == {"deepseek", "openai", "custom"}
     assert view["profiles"]["deepseek"]["base_url"] == "https://api.deepseek.com"
     assert view["profiles"]["openai"]["base_url"] == "https://api.openai.com/v1"
-    # .env 与设置文件都没有 key：必须给出明确状态与可读文案，而不是抛 401
+    #.env与设置文件都没有key：必须给出明确状态与可读文案，而不是抛401
     assert view["configured"] is False
     assert "API Key" in view["message"]
     assert view["profiles"]["deepseek"]["api_key"] == ""
@@ -74,10 +74,10 @@ def test_save_writes_file_atomically_and_masks_read(settings_env):
 
     path = settings_env.settings_path()
     assert path.exists()
-    # 落盘的是明文（服务端自己要能用），但读接口只给掩码
+    #落盘的是明文（服务端自己要能用），但读接口只给掩码
     assert PLAINTEXT_KEY in path.read_text(encoding="utf-8")
     assert saved.active == "openai"
-    # 目录里不残留半截临时文件
+    #目录里不留半截临时文件
     assert [p.name for p in path.parent.iterdir() if p.suffix == ".tmp"] == []
 
     view = settings_env.settings_view()
@@ -104,14 +104,14 @@ def test_masked_key_from_frontend_is_not_stored_as_plaintext(settings_env):
     })
     masked = settings_env.settings_view()["profiles"]["deepseek"]["api_key"]
 
-    # 前端把掩码原样回传：应当沿用旧 key，而不是把掩码当明文存下去
+    #前端把掩码原样回传：应当沿用旧key，而不是把掩码当明文存下去
     settings_env.apply_update({
         "active": "deepseek",
         "profiles": {"deepseek": {"base_url": "https://api.deepseek.com", "model": "deepseek-v4-flash", "api_key": masked}},
     })
     assert settings_env.active_config()["api_key"] == PLAINTEXT_KEY
 
-    # 掩码和已存 key 对不上时必须报错，不能悄悄存下去
+    #掩码和已存key对不上时必须报错，不能悄悄存下去
     with pytest.raises(settings_env.LLMSettingsError):
         settings_env.apply_update({
             "active": "deepseek",
@@ -119,9 +119,9 @@ def test_masked_key_from_frontend_is_not_stored_as_plaintext(settings_env):
         })
 
 
-# ═══════════════════════════════════════
-# 2. 非法输入校验
-# ═══════════════════════════════════════
+#═══════════════════════════════════════
+#2.非法输入校验
+#═══════════════════════════════════════
 
 @pytest.mark.parametrize("profile,expected", [
     ({"base_url": "", "model": "m", "api_key": "sk-x"}, "base_url"),
@@ -150,7 +150,7 @@ def test_apply_update_rejects_unknown_active(settings_env):
 
 
 def test_switching_to_unconfigured_provider_is_rejected(settings_env):
-    """切到没有 key 的厂商只会换来 401，必须在保存时就拦住。"""
+    """切到没有key的厂商只会换来401，必须在保存时就拦住。"""
     settings_env.apply_update({
         "active": "deepseek",
         "profiles": {"deepseek": {"base_url": "https://api.deepseek.com", "model": "deepseek-v4-flash", "api_key": PLAINTEXT_KEY}},
@@ -161,9 +161,9 @@ def test_switching_to_unconfigured_provider_is_rejected(settings_env):
     assert "API Key" in str(excinfo.value)
 
 
-# ═══════════════════════════════════════
-# 3. .env 回退链
-# ═══════════════════════════════════════
+#═══════════════════════════════════════
+#3. .env回退链
+#═══════════════════════════════════════
 
 def test_env_fallback_when_settings_file_missing(settings_env, monkeypatch):
     monkeypatch.setattr(settings_env.config, "DEEPSEEK_API_KEY", "sk-env-fallback-key")
@@ -178,7 +178,7 @@ def test_env_fallback_when_settings_file_missing(settings_env, monkeypatch):
     assert resolved["base_url"] == "https://env.example.com/v1"
     assert resolved["key_source"] == "env"
     assert resolved["configured"] is True
-    # .env 提供的 key 也只以掩码形式出现在读接口里
+    #.env提供的key也只以掩码形式出现在读接口里
     assert_no_plaintext(settings_env.settings_view())
 
 
@@ -217,9 +217,9 @@ def test_broken_settings_file_falls_back_to_defaults(settings_env):
     assert view["profiles"]["deepseek"]["base_url"] == "https://api.deepseek.com"
 
 
-# ═══════════════════════════════════════
-# 4. HTTP 接口（GET/POST/test）——响应用不含明文 key
-# ═══════════════════════════════════════
+#═══════════════════════════════════════
+#4. HTTP接口（GET/POST/test）——响应用不含明文key
+#═══════════════════════════════════════
 
 def test_get_settings_never_returns_plaintext_key(client, settings_env):
     settings_env.apply_update({
@@ -252,7 +252,7 @@ def test_post_settings_saves_and_switches_active(client, settings_env):
     assert body["active"] == "custom"
     assert body["model"] == "my-model"
     assert body["profiles"]["custom"]["base_url"] == "https://my-gateway.example.com/v1"
-    # 落盘后 ModelManager 下次请求读到的就是这一份
+    #落盘后ModelManager下次请求读到的就是这一份
     assert settings_env.active_config()["base_url"] == "https://my-gateway.example.com/v1"
 
 
@@ -280,7 +280,7 @@ def test_post_settings_is_rejected_while_generating(client, settings_env):
 
     assert response.status_code == 409
     assert "生成" in response.json()["detail"]
-    # 生成中拒绝时不能落盘
+    #生成中拒绝时不能落盘
     assert not settings_env.settings_path().exists()
 
 
@@ -335,12 +335,12 @@ def test_test_endpoint_without_any_key_gives_readable_422(client, settings_env, 
     assert "API Key" in response.json()["detail"]
 
 
-# ═══════════════════════════════════════
-# 5. ModelManager 实时替换
-# ═══════════════════════════════════════
+#═══════════════════════════════════════
+#5. ModelManager实时替换
+#═══════════════════════════════════════
 
 class FakeAsyncOpenAI:
-    """记录构造参数，并让自己看起来像一个能用的 OpenAI 客户端。"""
+    """记录构造参数，并让自己看起来像一个能用的OpenAI客户端。"""
 
     instances = []
 
@@ -365,7 +365,7 @@ class FakeCompletions:
 
 @pytest.fixture
 def manager_module(monkeypatch):
-    """按既有测试的方式注入假 openai 并加载 ModelManager 源码。"""
+    """按既有测试的方式注入假openai并加载ModelManager源码。"""
     openai_module = types.ModuleType("openai")
     openai_module.AsyncOpenAI = FakeAsyncOpenAI
     monkeypatch.setitem(sys.modules, "openai", openai_module)
@@ -374,7 +374,7 @@ def manager_module(monkeypatch):
 
 
 def _fake_client(manager):
-    """给 manager 挂一个假 client（走 _owned_client 所有权判定）。"""
+    """给manager挂一个假client（走_owned_client所有权判定）。"""
     client = types.SimpleNamespace(
         chat=types.SimpleNamespace(completions=FakeCompletions(types.SimpleNamespace(created=[]))),
         created=[],
@@ -386,7 +386,7 @@ def _fake_client(manager):
 
 
 def test_init_does_not_build_client_at_import_time(manager_module):
-    """import 期（构造时）不能构造唯一客户端：设置改完必须能换。"""
+    """import期（构造时）不能构造唯一客户端：设置改完必须能换。"""
     manager = manager_module.ModelManager()
 
     assert manager.client is None
@@ -401,14 +401,14 @@ def test_generate_reads_active_profile_every_request(manager_module, settings_en
         "active": "deepseek",
         "profiles": {"deepseek": {"base_url": "https://api.deepseek.com", "model": "deepseek-v4-flash", "api_key": "sk-first-key"}},
     })
-    #阶段4后非流式聚合(use_tools=False)走ChatClientPort；此处钉SDK路径语义，故use_tools=True
+    #非流式聚合(use_tools=False)走ChatClientPort；此处钉SDK路径语义，故use_tools=True
     asyncio.run(manager.generate([], {}, use_tools=True))
     first = FakeAsyncOpenAI.instances[-1]
     assert first.kwargs["api_key"] == "sk-first-key"
     assert first.kwargs["base_url"] == "https://api.deepseek.com"
     assert first.created[0]["model"] == "deepseek-v4-flash"
 
-    # 改设置：下一个请求必须走新 base_url/key/model，无需重启
+    #改设置：下一个请求必须走新base_url/key/model，无需重启
     settings_env.apply_update({
         "active": "custom",
         "profiles": {"custom": {"base_url": "https://switched.example.com/v1", "model": "switched-model", "api_key": "sk-second-key"}},
@@ -431,11 +431,11 @@ def test_client_is_cached_while_config_unchanged(manager_module, settings_env):
         "profiles": {"deepseek": {"base_url": "https://api.deepseek.com", "model": "deepseek-v4-flash", "api_key": "sk-same-key"}},
     })
 
-    #阶段4后非流式聚合走端口；客户端缓存钉在SDK路径上，故use_tools=True
+    #非流式聚合走端口；客户端缓存钉在SDK路径上，故use_tools=True
     asyncio.run(manager.generate([], {}, use_tools=True))
     asyncio.run(manager.generate([], {}, use_tools=True))
 
-    # (base_url, api_key) 没变 => 复用同一个客户端
+    #(base_url, api_key)没变=>复用同一个客户端
     assert len(FakeAsyncOpenAI.instances) == 1
 
 
@@ -487,7 +487,7 @@ def test_generate_raises_readable_error_when_no_key_anywhere(manager_module, set
 
 
 def test_injected_client_is_never_replaced(manager_module, settings_env):
-    """既有测试通过替换 mgr.client 注入假客户端：那条路径不能被实时替换逻辑覆盖。"""
+    """既有测试通过替换mgr.client注入假客户端：那条路径不能被实时替换逻辑覆盖。"""
     manager = manager_module.ModelManager()
     injected = _fake_client(manager)
 

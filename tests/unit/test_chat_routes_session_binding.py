@@ -1,7 +1,7 @@
-"""P1-3 回归：生成请求必须落在启动时绑定的会话实例上，不能被门面指针漂移串档。
+"""生成请求必须落在启动时绑定的会话实例上，不能被门面指针漂移串档。
 
-对应审计报告 P1-3：ChatFacade._current_id 是可变指针，而 stream_chat 把实际调用
-推迟到 create_task 之后；期间任何换绑都会让本轮 prompt/记忆/RAG 落进错误会话。
+ChatFacade._current_id是可变指针，而stream_chat把实际调用推迟到create_task之后；
+期间任何换绑都会让当次prompt/记忆/RAG落进错误会话。
 """
 
 import asyncio
@@ -29,7 +29,7 @@ class StubSession:
 
 
 class DriftFacade:
-    """模拟真实门面：__getattr__ 在“调用时”才解析当前指针。"""
+    """模拟真实门面：__getattr__在“调用时”才解析当前指针。"""
 
     def __init__(self, sessions, current="A"):
         self._sessions = sessions
@@ -58,7 +58,7 @@ def _run_stream(routes, request, on_started=None):
 
     async def scenario():
         response = await routes.stream_chat(request)
-        #此刻 run() 刚被 create_task 排队、还没拿到执行权：换绑窗口真实存在
+        #此刻run()刚被create_task排队、还没拿到执行权：换绑窗口真实存在
         if on_started is not None:
             on_started()
         chunks = []
@@ -83,7 +83,7 @@ def test_stream_uses_snapshot_taken_before_task_runs(routes, monkeypatch):
 
 
 def test_stream_does_not_follow_facade_attr_resolution(routes, monkeypatch):
-    """即使 __getattr__ 此刻会解析到别的会话，也只用启动时捕获的实例。"""
+    """即使__getattr__此刻会解析到别的会话，也只用启动时捕获的实例。"""
     session_a, decoy = StubSession("A"), StubSession("decoy")
 
     class FacadeWithDecoy(DriftFacade):

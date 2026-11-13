@@ -1,6 +1,6 @@
-"""P0-1 回归：保存设置端点的「凭据—地址绑定」与出站校验。
+"""保存设置端点的「凭据—地址绑定」与出站校验。
 
-覆盖审计报告 P0-1：只改 base_url 不重输 key 时，旧 key 不得被绑定到新地址落盘。
+只改base_url不重输key时，旧key不得被绑定到新地址落盘。
 """
 
 import json
@@ -17,7 +17,7 @@ EVIL_URL = "https://gateway.attacker-example.net/v1"
 
 @pytest.fixture
 def settings_env(tmp_path, monkeypatch):
-    """与生产同一个加载器：settings_routes 与测试拿到同一份 llm_settings 模块对象。"""
+    """与生产同一个加载器：settings_routes与测试拿到同一份llm_settings模块对象。"""
     llm_settings = load_llm_settings()
     monkeypatch.setattr(llm_settings, "settings_path", lambda: tmp_path / "data" / "llm_settings.json")
     monkeypatch.delenv("LLM_ALLOW_PRIVATE_BASE_URL", raising=False)
@@ -46,9 +46,9 @@ def _seed_deepseek(client, base_url=None, api_key=PLAINTEXT_KEY):
     return response
 
 
-# ═══════════════════════════════════════
-# 1. 改地址但不提交 key → 422，且不落盘
-# ═══════════════════════════════════════
+#═══════════════════════════════════════
+#1.改地址但不提交key → 422，且不落盘
+#═══════════════════════════════════════
 
 def test_changing_base_url_without_key_is_rejected(client, settings_env, tmp_path):
     _seed_deepseek(client)
@@ -58,7 +58,7 @@ def test_changing_base_url_without_key_is_rejected(client, settings_env, tmp_pat
     assert response.status_code == 422
     detail = response.json()["detail"]
     assert "base_url" in detail and "API Key" in detail
-    #旧 key 仍只属于旧地址：生效配置没有被改写，磁盘上也没有新地址
+    #旧key仍只属于旧地址：生效配置没有被改写，磁盘上也没有新地址
     effective = settings_env.resolve_profile("deepseek")
     assert effective["base_url"] == "https://api.deepseek.com"
     assert effective["api_key"] == PLAINTEXT_KEY
@@ -67,7 +67,7 @@ def test_changing_base_url_without_key_is_rejected(client, settings_env, tmp_pat
 
 
 def test_empty_key_string_on_new_base_url_is_rejected(client):
-    """前端改地址时把 key 输入框清空会提交空串——同样属于“未重输 key”。"""
+    """前端改地址时把key输入框清空会提交空串——同样属于“未重输key”。"""
     _seed_deepseek(client)
 
     response = _post(client, {"deepseek": {"base_url": EVIL_URL, "api_key": ""}})
@@ -77,7 +77,7 @@ def test_empty_key_string_on_new_base_url_is_rejected(client):
 
 
 def test_mask_replay_on_new_base_url_is_rejected(client, settings_env):
-    """把掩码原样回传也是“沿用旧 key”，不允许跟随地址迁移。"""
+    """把掩码原样回传也是“沿用旧key”，不允许跟随地址迁移。"""
     _seed_deepseek(client)
     masked = settings_env.settings_view()["profiles"]["deepseek"]["api_key"]
 
@@ -88,8 +88,8 @@ def test_mask_replay_on_new_base_url_is_rejected(client, settings_env):
 
 
 def test_first_time_base_url_without_key_reports_missing_key(client):
-    """首次配置某厂商（没有可搬运的旧 key）时，提示应是“未配置 API Key”，
-    而不是把地址变更误报成“已保存 Key 被转发”。"""
+    """首次配置某厂商（没有可搬运的旧key）时，提示应是“未配置API Key”，
+    而不是把地址变更误报成“已保存Key被转发”。"""
     response = _post(
         client,
         {"openai": {"base_url": "https://api.openai.com/v1", "model": "gpt-4o-mini"}},
@@ -102,9 +102,9 @@ def test_first_time_base_url_without_key_reports_missing_key(client):
     assert "转发" not in detail
 
 
-# ═══════════════════════════════════════
-# 2. 显式重输 key 后可改地址；仅归一化差异不算改地址
-# ═══════════════════════════════════════
+#═══════════════════════════════════════
+#2.显式重输key后可改地址；仅归一化差异不算改地址
+#═══════════════════════════════════════
 
 def test_changing_base_url_with_explicit_key_is_allowed(client, settings_env):
     _seed_deepseek(client)
@@ -119,7 +119,7 @@ def test_changing_base_url_with_explicit_key_is_allowed(client, settings_env):
 
 
 def test_trailing_slash_and_case_do_not_require_new_key(client, settings_env):
-    """大小写/末尾斜杠归一化后地址相同，沿用旧 key 属合法操作。"""
+    """大小写/末尾斜杠归一化后地址相同，沿用旧key属合法操作。"""
     _seed_deepseek(client)
 
     response = _post(client, {"deepseek": {"base_url": "HTTPS://API.DEEPSEEK.COM/"}})
@@ -129,9 +129,9 @@ def test_trailing_slash_and_case_do_not_require_new_key(client, settings_env):
     assert effective["api_key"] == PLAINTEXT_KEY
 
 
-# ═══════════════════════════════════════
-# 3. 保存路径的出站校验
-# ═══════════════════════════════════════
+#═══════════════════════════════════════
+#3.保存路径的出站校验
+#═══════════════════════════════════════
 
 def test_saving_private_base_url_is_blocked(client, settings_env):
     response = _post(

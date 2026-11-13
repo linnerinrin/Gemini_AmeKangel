@@ -38,7 +38,7 @@ def test_init_creates_tools():
 
     mgr.init(rag_mgr=object(), memory_mgr=object(), model_mgr=object())
 
-    assert len(mgr.tools) == 11  # 7个原有工具 + 阶段2追加的4个只读工具
+    assert len(mgr.tools) == 11  #7个核心工具+4个只读工具
 
 
 def test_load_mode_records_mode():

@@ -1,9 +1,9 @@
-# """
+#"""
 #架构作用：为既有chat表补充新字段，兼容旧库并保持重复执行幂等
 #调用方：数据库初始化路径；接收SQL执行callable，不拥有连接生命周期
 #数据流：模块内DDL →连接执行/提交→按数据库身份区分的进程内就绪标记
 #就绪标记绑定配置库名：热切换MYSQL_DATABASE后身份失配，迁移会重新执行
-# """
+#"""
 """
 config/schema.py表结构迁移（幂等）
 
@@ -20,10 +20,10 @@ THINKING_COLUMN_DDL = 'alter table chat add column thinking mediumtext null;'
 LLM_MODEL_COLUMN_DDL = "alter table chat add column llm_model varchar(64) null;"
 LLM_PROVIDER_COLUMN_DDL = "alter table chat add column llm_provider varchar(32) null;"
 
-# """
+#"""
 #读取当前配置的目标库名作为就绪标记的身份；惰性import避免模块级依赖config
 #读取失败返回None，此时退化为旧行为（不区分身份）
-# """
+#"""
 def _current_db_identity():
     try:
         from app.config.config import config
@@ -32,7 +32,7 @@ def _current_db_identity():
         return None
 
 
-# Per-process state: only a successful ALTER or a duplicate-column response is ready.
+#Per-process state: only a successful ALTER or a duplicate-column response is ready.
 #布尔标记保留原语义；*_ready_db记录成功时的数据库身份，身份变化（配置热切换）视为未就绪
 _ready = False
 _llm_model_ready = False

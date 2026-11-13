@@ -24,7 +24,7 @@ def test_sse_error_is_terminal_not_done(client, fake_services):
     fake_services.chat.stream_chat = fail
     client.post('/chat/new_session', json={'session_num': 1})
     events = parse_sse(client.post('/chat/stream_chat', json={'prompt': 'hi', 'session_id': 'session-1'}).text)
-    # 异常原文只进服务端日志，客户端收通用文案
+    #异常原文只进服务端日志，客户端收通用文案
     assert events == [{'type': 'thinking_delta', 'text': '开始'}, {'type': 'error', 'message': '生成过程中出现错误，请稍后重试'}]
 
 

@@ -77,7 +77,7 @@ def test_save_close_is_only_handled_by_window_manager():
 
 
 def test_live_topics_use_distinct_backend_modes():
-    """每个直播主题一个独立 mode，否则不同直播会共用上下文/记忆"""
+    """每个直播主题一个独立mode，否则不同直播会共用上下文/记忆"""
     source = (STATIC_ROOT / "js" / "data" / "topics.js").read_text(encoding="utf-8")
     modes = dict(re.findall(r'charVariant: "([\w-]+)", mode: "(\d*)"', source))
 
@@ -97,7 +97,7 @@ def test_role_mapping_matches_contract():
 
 
 def test_history_api_supports_mode_parameter():
-    """直播窗口要按主题拉历史，api 层必须能带上 mode"""
+    """直播窗口要按主题拉历史，api层必须能带上mode"""
     source = (STATIC_ROOT / "js" / "data" / "api" / "chat.js").read_text(encoding="utf-8")
 
     assert "getHistory: function(mode)" in source
@@ -126,15 +126,15 @@ def test_live_subtitle_streams_and_box_auto_sizes():
     registry = (STATIC_ROOT / "js" / "data" / "registry.js").read_text(encoding="utf-8")
     css = (STATIC_ROOT / "css" / "desktop.css").read_text(encoding="utf-8")
 
-    # 流式阶段必须通知 channel（否则字幕只在回复结束时一次性出现）
+    #流式过程必须通知channel（否则字幕只在回复结束时一次性出现）
     assert "channel.onAnswerLifecycle" in chat_source
     assert "onAnswerLifecycle" in registry
     assert "function updateStreamReply" in live_source
-    # 旧的逐字定时器会与流式打架，应已移除
+    #逐字定时器会与流式冲突，不得存在
     assert "streamReplyTimer" not in live_source
 
     overlay = css.split(".live-reply-overlay {")[1].split("}")[0]
-    assert "width: max-content" in overlay   # 宽度跟着文字长
-    assert "max-width: 80%" in overlay       # 到上限后换行
-    assert "min-width" in overlay            # 短句也保持长方形
-    assert "white-space: pre-wrap" in overlay  # 换行会改变高度
+    assert "width: max-content" in overlay   #宽度跟着文字长
+    assert "max-width: 80%" in overlay       #到上限后换行
+    assert "min-width" in overlay            #短句也保持长方形
+    assert "white-space: pre-wrap" in overlay  #换行会改变高度

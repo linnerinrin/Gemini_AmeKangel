@@ -59,7 +59,7 @@ def test_stream_generate_emits_reasoning_and_tool_name_once():
 
 
 def test_stream_generate_records_resolved_provider_and_model(monkeypatch):
-    """R12：流式路径同样记录本次实际解析出的厂商/模型"""
+    """流式路径同样记录本次实际解析出的厂商/模型"""
     chunks = [SimpleNamespace(choices=[SimpleNamespace(
         delta=SimpleNamespace(content="ok", reasoning_content=None, tool_calls=[]))])]
     manager = ModelManager.__new__(ModelManager)
@@ -78,7 +78,7 @@ def test_stream_generate_records_resolved_provider_and_model(monkeypatch):
 
 
 def test_truncated_and_empty_outputs_do_not_break_the_turn():
-    """被截断只做标记，不再抛异常中断整轮对话（debug 13）"""
+    """被截断只做标记，不抛异常中断整轮对话"""
     manager = ModelManager.__new__(ModelManager)
     manager.tools = []
     chunks = [SimpleNamespace(choices=[SimpleNamespace(finish_reason="length",
@@ -106,7 +106,7 @@ def test_emoji_labels_normalize_to_codes():
     assert normalize_emoji_text("【永远爱你】") == "jine_pien_loveforever"
     assert normalize_emoji_text("  永远爱你  ") == "jine_pien_loveforever"
     assert normalize_emoji_text("<好>") == "jine_pien_ok"
-    # 夹在文字里的标签只替换标签本身，且不误伤普通单字
+    #夹在文字里的标签只替换标签本身，且不误伤普通单字
     assert normalize_emoji_text("好呀<永远爱你>") == "好呀jine_pien_loveforever"
     assert normalize_emoji_text("好的") == "好的"
     assert normalize_emoji_text("jine_pien_ok") == "jine_pien_ok"

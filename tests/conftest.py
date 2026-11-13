@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_PATH = PROJECT_ROOT / "contracts" / "api_contract.json"
-# 契约里表示"这一项允许为 null"的前缀，见 assert_shape
+#契约里表示"这一项允许为null"的前缀，见assert_shape
 NULLABLE_PREFIX = "nullable:"
 
 if str(PROJECT_ROOT) not in sys.path:
@@ -45,10 +45,10 @@ def contracts():
 
 
 def contract_entries(contracts):
-    """把契约文件展平成 [(path, entry)]，每个 entry 是一个具体 method 的登记。
+    """把契约文件展平成[(path, entry)]，每个entry是一个具体method的登记。
 
-    一个路径可能有多个 method（例如 /chat/settings/llm 的 GET/POST），所以统一用
-    value["methods"] 列表登记；两个契约测试都按条目迭代，新登记会自然被覆盖。
+    一个路径可能有多个method（例如/chat/settings/llm的GET/POST），所以统一用
+    value["methods"]列表登记；两个契约测试都按条目迭代，新登记会自然被覆盖。
     """
     return [
         (path, entry)
@@ -117,7 +117,7 @@ class FakeChatService:
         self.mode = mode
 
     def read_history(self, mode=None):
-        """按 mode(直播主题) 读取历史，供前端回填各自的上下文"""
+        """按mode(直播主题)读取历史，供前端回填各自的上下文"""
         if mode is None:
             return list(self.history)
         return list(self.history_by_mode.get(str(mode), []))
@@ -162,7 +162,7 @@ def assert_shape(actual, expected):
         assert isinstance(actual, list)
         return
     if isinstance(expected, str) and expected.startswith(NULLABLE_PREFIX):
-        # "nullable:string"：老数据（如新增列之前的历史行）允许是 None
+        #"nullable:string"：该字段允许为None
         if actual is None:
             return
         assert_shape(actual, expected[len(NULLABLE_PREFIX):])

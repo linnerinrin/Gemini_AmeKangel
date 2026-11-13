@@ -1,4 +1,4 @@
-"""P1-4 回归：未配置 API Key 时不再 500/通用错误，而是可读 422 / 带引导文案的流式 error。"""
+"""未配置API Key时，单次聊天返回可读422、流式聊天返回带引导文案的error事件。"""
 
 import json
 
@@ -16,7 +16,7 @@ def client(fake_services):
 
 
 def _missing_key_error():
-    """用与运行时同一个模块对象构造 NotConfiguredError，保证 isinstance 命中。"""
+    """用与运行时同一个模块对象构造NotConfiguredError，保证isinstance命中。"""
     llm_settings = load_llm_settings()
     return llm_settings.NotConfiguredError(llm_settings.missing_key_message("deepseek"))
 

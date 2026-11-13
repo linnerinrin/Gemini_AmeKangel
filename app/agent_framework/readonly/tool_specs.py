@@ -1,8 +1,8 @@
-# """
+#"""
 #架构作用：把只读工具包装为原项目ToolSpec形状的规格列表，是readonly包接入注册表的桥
 #调用方：接入适配层（负责把ReadOnlyFileTools实例挂到mgr.readonly_tools并合并规格）
 #数据流：build_readonly_tool_specs(workspace_root) → list[ToolSpec] →追加进TOOL_REGISTRY末尾
-# """
+#"""
 """
 agent_framework/readonly/tool_specs.py只读工具规格（与app/tools/registry.py完全兼容）
 
@@ -10,19 +10,19 @@ agent_framework/readonly/tool_specs.py只读工具规格（与app/tools/registry
 - ToolSpec / SCOPE_INTERNAL函数内延迟导入：本文件在接入前不得触发对原项目的import，
 保持readonly包「除本文件外不依赖原项目」的边界；
 - impl为_bind_*(mgr)闭包工厂：工厂只捕获mgr，真正读取在被调用时；
-- mgr语义（待确认）：通过getattr(mgr, "readonly_tools")取得ReadOnlyFileTools实例——
+- mgr语义：通过getattr(mgr, "readonly_tools")取得ReadOnlyFileTools实例——
 这是接入点约定，接入时由适配层把实例挂到FuncCallManager或包装owner上；
 -实现函数返回str（ReadResult序列化为可读文本，含文件:行号与截断提示）；
 -实现函数不写docstring：描述只放ToolSpec.description，由适配器写入__doc__
 
-重要：本文件不注册进TOOL_REGISTRY，接入前需人工评估风险
+重要：本文件不注册进TOOL_REGISTRY，接入前需人工评估行为影响
 """
 
 
-# """
+#"""
 #模块一：结果序列化
 #把ReadResult拍平为模型可读文本；失败给原因，截断给显式提示
-# """
+#"""
 def _format_result(result) -> str:
     """ReadResult → 可读文本：失败带原因，截断带提示（内部函数，不进规格）。"""
     if not result.ok:
@@ -37,10 +37,10 @@ def _format_result(result) -> str:
     return "\n".join(lines)
 
 
-# """
+#"""
 #模块二：工具实现闭包（impl工厂）
-#每个_bind_*返回带真实签名的工具函数；mgr上挂readonly_tools是接入约定（待确认）
-# """
+#每个_bind_*返回带真实签名的工具函数；mgr上挂readonly_tools是接入约定
+#"""
 def _bind_read_file(mgr):
     def read_file(path: str, offset: int = 1, limit: int = 0) -> str:
         tools = getattr(mgr, "readonly_tools")
@@ -77,12 +77,12 @@ def _bind_grep(mgr):
     return grep
 
 
-# """
+#"""
 #模块三：规格构建入口
 #延迟导入ToolSpec / SCOPE_INTERNAL；返回的list顺序即追加顺序（read/list/glob/grep）
-# """
+#"""
 def build_readonly_tool_specs(workspace_root: str) -> list:
-    """构建四个只读工具的 ToolSpec 列表；workspace_root 仅作文档语义保留，实例由 mgr 注入。"""
+    """构建四个只读工具的ToolSpec列表；workspace_root仅作文档语义保留，实例由mgr注入。"""
     from app.tools.registry import SCOPE_INTERNAL, ToolSpec  #延迟导入：见模块docstring
 
     return [

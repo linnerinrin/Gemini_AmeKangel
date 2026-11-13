@@ -1,15 +1,15 @@
-# """
+#"""
 #架构作用：将工具注册表的external工具转换为MCP Server，并提供HTTP挂载及stdio入口
 #调用方：FastAPI lifespan/mount装配或本地MCP客户端启动；模型/检索管理器按需延迟加载
 #数据流：注册表schema → MCP Tool/签名校验→客户端请求→对应实现闭包
-# """
+#"""
 """
-mcp/server.py把工具注册表暴露为MCP Server（P6b）
+mcp/server.py把工具注册表暴露为MCP Server
 
-唯一事实来源仍然是app/tools/registry.py：本文件不定义任何工具的名字、描述或参数schema，
-只把registry.external_specs()（方案R5的5个无状态工具）转成MCP工具
+唯一事实来源是app/tools/registry.py：本文件不定义任何工具的名字、描述或参数schema，
+只把registry.external_specs()（无状态工具）转成MCP工具
 
-    registry.TOOL_REGISTRY（唯一来源，11个：7个核心 + 4个只读）
+    registry.TOOL_REGISTRY（唯一来源，11个：7个核心+ 4个只读）
       ├─ adapters/openai.py    →模型可见的OpenAI function载荷
       ├─ adapters/langgraph.py → ToolNode执行体
       └─ mcp/server.py         → MCP tools（本文件，只取SCOPE_EXTERNAL的5个）
@@ -17,16 +17,16 @@ mcp/server.py把工具注册表暴露为MCP Server（P6b）
 ## schema保真：为什么不是「让SDK从函数签名推导」
 
 MCPServer.add_tool()会用func_metadata()从函数签名推导input schema。若放任推导，注册表里的
-显式JSON Schema与推导结果就成了两份定义，正是P6a刚消灭的漂移陷阱。实测mcp 2.3.0允许
+显式JSON Schema与推导结果会成为两份定义，造成漂移。实测mcp 2.3.0允许
 「注册表schema直接喂给MCP」，所以走这条路（探针结论见docs/mcp-server.md）：
 
 1.不调用Tool.from_function()（它不接受显式schema，事后再改tool.parameters又依赖SDK内部
-可变属性），改为直接调用Tool的pydantic构造器，把deepcopy(spec.parameters)作为声明字段
+可变属性），这里直接调用Tool的pydantic构造器，把deepcopy(spec.parameters)作为声明字段
    parameters传入；server.py的list_tools()原样把它当作`inputSchema`发给客户端：
    `MCPTool(..., input_schema=info.parameters, ...)`；
 2. fn_metadata（参数校验用的arg_model）用SDK自己的func_metadata()从包装函数构建，
 校验路径与from_function()完全一致，只是schema来源换成注册表；
-3.包装函数故意写成`**kwargs`，SDK看不到真实形参，改为用inspect.Signature按注册表的
+3.包装函数故意写成`**kwargs`，SDK看不到真实形参，故用inspect.Signature按注册表的
    properties / required生成`__signature__`。于是「对外公布的inputSchema」与「mcp侧参数校验
 用的arg_model」也来自同一份注册表，不会出现「公布了A、实际按B校验」的分裂
 
@@ -77,7 +77,7 @@ INSTRUCTIONS = (
     "save_memory / change_status 依赖「当前存档」这类进程内状态，不对 MCP 客户端开放。"
 )
 
-# JSON Schema类型→ Python类型；未标注类型（或自定义类型）一律回退Any
+#JSON Schema类型→ Python类型；未标注类型（或自定义类型）一律回退Any
 #只覆盖注册表现有工具用到的类型，新增类型时在这里补一行即可
 _JSON_SCHEMA_TYPES = {
     "string": str,
@@ -89,16 +89,16 @@ _JSON_SCHEMA_TYPES = {
 }
 
 
-# """
+#"""
 #模块一：LazyManager ——延迟解析app.managers
 #只在属性访问时才导入重型管理器，让不依赖管理器的工具（output_time/search_web）可离线工作；
 #默认来源是app.managers的进程级FunctionCallManager，必要时就地补一次init
-# """
+#"""
 class LazyManager:
-    """延迟解析管理器的代理：只有真正访问属性时才去 import app.managers。
+    """延迟解析管理器的代理：只有真正访问属性时才去import app.managers。
 
-    registry 里的 impl 是 `spec.impl(mgr)` 的闭包，只把 mgr 存起来，访问 mgr.xxx 才用到它；
-    因此 output_time / search_web 这类不碰管理器的工具可以完全离线工作。
+    registry里的impl是`spec.impl(mgr)`的闭包，只把mgr存起来，访问mgr.xxx才用到它；
+    因此output_time / search_web这类不碰管理器的工具可以完全离线工作。
     """
 
     def __init__(self, provider: Callable[[], Any]):
@@ -111,16 +111,16 @@ class LazyManager:
         return self._resolved
 
     def __getattr__(self, name: str) -> Any:
-        #注意：_provider / _resolved已经由__init__写进实例字典，不会走到这里
+        #_provider/_resolved已由__init__写进实例字典，不会走到这里
         return getattr(self._manager(), name)
 
 
 def default_manager() -> Any:
-    """默认管理器来源：app.managers 里的全局 FunctionCallManager 单例。
+    """默认管理器来源：app.managers里的全局FunctionCallManager单例。
 
-    先复用已被 ChatSession.init() 装配过的实例（HTTP 挂载场景：Web 进程里已经初始化）。
-    独立跑 stdio server 时没有 ChatSession，就地用同样的三个管理器补一次 init，
-    这样 retrieve_* / rewrite 才能拿到 rag_mgr / model_mgr。
+    先复用被ChatSession.init()装配过的实例（HTTP挂载场景：Web进程里已完成初始化）。
+    独立跑stdio server时没有ChatSession，就地用同样的三个管理器补一次init，
+    这样retrieve_* / rewrite才能拿到rag_mgr / model_mgr。
     """
     from app.managers import (  #延迟导入：app.managers会连带加载torch/模型等重依赖
         functioncall_manager,
@@ -134,20 +134,20 @@ def default_manager() -> Any:
     return functioncall_manager
 
 
-# """
+#"""
 #模块二：schema与签名保真——把注册表的JSON Schema变成MCP可见的Tool
 #公布的inputSchema与校验用的arg_model同源（都从ToolSpec.parameters派生），避免漂移；
-# Tool经pydantic构造器一次成形，不再事后改写SDK内部属性
-# """
+#Tool经pydantic构造器一次成形，不改写SDK内部属性
+#"""
 def _property_annotation(prop: Dict[str, Any]) -> Any:
-    """JSON Schema 单个属性 → Python 类型标注（未知类型回退 Any）。"""
+    """JSON Schema单个属性 → Python类型标注（未知类型回退Any）。"""
     return _JSON_SCHEMA_TYPES.get(prop.get("type"), Any)
 
 
 def signature_from_schema(schema: Dict[str, Any]) -> inspect.Signature:
-    """按注册表的 JSON Schema 生成函数签名（只用于 MCP 侧的参数校验）。
+    """按注册表的JSON Schema生成函数签名（只用于MCP侧的参数校验）。
 
-    形参名、必填集合、类型全部来自注册表，所以校验用的 arg_model 与公布的 inputSchema
+    形参名、必填集合、类型全部来自注册表，所以校验用的arg_model与公布的inputSchema
     同源，不会互相漂移。
     """
     required = set(schema.get("required") or ())
@@ -173,7 +173,7 @@ def signature_from_schema(schema: Dict[str, Any]) -> inspect.Signature:
 
 
 def _build_tool(spec: ToolSpec, manager: Any) -> Tool:
-    """把单个 ToolSpec 转成 MCP 工具（名字/描述/schema 都取自注册表）。"""
+    """把单个ToolSpec转成MCP工具（名字/描述/schema都取自注册表）。"""
 
     async def invoke(**kwargs: Any) -> Any:
         #真实形参是**kwargs（SDK通过__signature__看到注册表的形参），
@@ -188,7 +188,7 @@ def _build_tool(spec: ToolSpec, manager: Any) -> Tool:
     invoke.__doc__ = spec.description
     invoke.__signature__ = signature_from_schema(spec.parameters)
 
-    # structured_output=False：不要为str返回值自动生成outputSchema，
+    #structured_output=False：不要为str返回值自动生成outputSchema，
     #注册表没有输出schema，对外形状必须只有注册表那一份；
     #不用Tool.from_function()（它不收显式schema，事后改写tool.parameters依赖SDK内部可变性），
     #直接走Tool的pydantic构造器，把注册表schema作为声明字段一次传入（用副本，防调用方污染唯一来源）
@@ -203,9 +203,9 @@ def _build_tool(spec: ToolSpec, manager: Any) -> Tool:
 
 
 def build_server(manager: Any = None) -> MCPServer:
-    """构建只注册 5 个外部工具的 MCP Server。
+    """构建只注册5个外部工具的MCP Server。
 
-    manager 传 None 时使用 LazyManager(default_manager)，即首次真正需要时才加载
+    manager传None时使用LazyManager(default_manager)，即首次真正需要时才加载
     app.managers；测试可以注入替身，从而完全不联网、不加载模型。
     """
     if manager is None:
@@ -224,23 +224,23 @@ _mounted_server: Optional[MCPServer] = None
 
 
 def get_server() -> MCPServer:
-    """进程内单例：mount_mcp / mcp_lifespan / main 共用同一个实例。"""
+    """进程内单例：mount_mcp / mcp_lifespan / main共用同一个实例。"""
     global _server
     if _server is None:
         _server = build_server()
     return _server
 
 
-# """
+#"""
 #模块三：传输、挂载与进程入口
 #同一server既可mount到FastAPI（HTTP，/mcp），也可用stdio独立运行；
 #传输安全默认开启DNS rebinding校验，非本机Host须显式配置allowed_hosts
-# """
+#"""
 def _transport_security(allowed_hosts: Optional[List[str]]) -> TransportSecuritySettings:
-    """StreamableHTTP 的 Host 头校验设置。
+    """StreamableHTTP的Host头校验设置。
 
-    默认开启DNS rebinding防护（SDK默认只放行127.0.0.1/localhost/[::1] 的Host）。
-    本机/局域网里其他模型接入时，客户端填 192.168.x.x:port 或经反向代理的Host会被
+    默认开启DNS rebinding防护（SDK默认只放行127.0.0.1/localhost/[::1]的Host）。
+    本机/局域网里其他模型接入时，客户端填192.168.x.x:port或经反向代理的Host会被
     421 Invalid Host header拒绝，必须把允许的Host:port显式传给allowed_hosts；
     只有确认只在可信网络内提供服务时才可考虑显式关闭该校验
     """
@@ -255,16 +255,16 @@ def mount_mcp(
     server: Optional[MCPServer] = None,
     allowed_hosts: Optional[List[str]] = None,
 ) -> MCPServer:
-    """把 StreamableHTTP 子应用挂到传入的 FastAPI/Starlette app 的 `path` 上。
+    """把StreamableHTTP子应用挂到传入的FastAPI/Starlette app的`path`上。
 
-    这里用 `Route(path, endpoint=子应用)` 而不是 `app.mount(path, 子应用)`：Starlette 的 Mount
-    正则要求前缀后有斜杠，`app.mount("/mcp", 子应用)` 会让 POST /mcp 先吃一个 307 跳到 /mcp/，
-    而 MCP 客户端默认不跟随重定向。Route 把子应用当 ASGI app 直接调用（Starlette 只对函数型
-    endpoint 做 request→response 包装），路径原样传入，子应用里注册的也是同一个 path，
-    因此对外就是干净的 /mcp。
+    这里用`Route(path, endpoint=子应用)`而不是`app.mount(path,子应用)`：Starlette的Mount
+    正则要求前缀后有斜杠，`app.mount("/mcp",子应用)`会让POST /mcp先吃一个307跳到/mcp/，
+    而MCP客户端默认不跟随重定向。Route把子应用当ASGI app直接调用（Starlette只对函数型
+    endpoint做request→response包装），路径原样传入，子应用里注册的也是同一个path，
+    因此对外就是干净的/mcp。
 
-    注意：挂载的 Starlette 子应用不会自己跑 lifespan，必须同时把 mcp_lifespan 接到父 app 上，
-    否则 session_manager 没启动，请求会失败。
+    挂载的Starlette子应用不会自己跑lifespan，必须同时把mcp_lifespan接到父app上，
+    否则session_manager没启动，请求会失败。
     """
     global _mounted_server
     server = server or get_server()
@@ -272,7 +272,7 @@ def mount_mcp(
         streamable_http_path=path,
         transport_security=_transport_security(allowed_hosts),
     )
-    # methods=None：MCP的StreamableHTTP端点同时用POST/GET/DELETE，不能被Route默认的GET限制住
+    #methods=None：MCP的StreamableHTTP端点同时用POST/GET/DELETE，不能被Route默认的GET限制住
     app.router.routes.append(Route(path, endpoint=sub_app))
     _mounted_server = server
     return server
@@ -280,14 +280,14 @@ def mount_mcp(
 
 @asynccontextmanager
 async def mcp_lifespan(app: Any = None, server: Optional[MCPServer] = None):
-    """父 app 的 lifespan 里驱动 MCP 的 session_manager。
+    """父app的lifespan里驱动MCP的session_manager。
 
-    可直接赋值给 app.router.lifespan_context（Starlette/FastAPI 会以 app 为参数调用它）：
+    可直接赋值给app.router.lifespan_context（Starlette/FastAPI会以app为参数调用它）：
 
         mount_mcp(app)
         app.router.lifespan_context = mcp_lifespan
 
-    已有自己的 lifespan 时也可以嵌套：
+    已有自己的lifespan时也可以嵌套：
 
         @asynccontextmanager
         async def lifespan(app):
@@ -297,7 +297,7 @@ async def mcp_lifespan(app: Any = None, server: Optional[MCPServer] = None):
     server = server or _mounted_server or get_server()
     try:
         manager = server.session_manager
-    except RuntimeError as exc:  # session_manager要先调用过streamable_http_app()
+    except RuntimeError as exc:  #session_manager要先调用过streamable_http_app()
         raise RuntimeError(
             "mcp_lifespan 必须在 mount_mcp(app) 之后进入：挂载时才会创建 session_manager"
         ) from exc
@@ -306,7 +306,7 @@ async def mcp_lifespan(app: Any = None, server: Optional[MCPServer] = None):
 
 
 def main(argv: Optional[List[str]] = None) -> None:
-    """命令行入口：默认 stdio（本地客户端直连），可选独立 HTTP 服务。"""
+    """命令行入口：默认stdio（本地客户端直连），可选独立HTTP服务。"""
     parser = argparse.ArgumentParser(
         prog="python -m app.mcp_server.server",
         description="AmeKangel MCP Server：把工具注册表的 5 个无状态工具暴露给外部模型",

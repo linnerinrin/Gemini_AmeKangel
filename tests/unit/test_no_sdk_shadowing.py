@@ -1,12 +1,12 @@
 """仓库内的包名不得遮蔽第三方顶层模块。
 
-背景（真实事故）：MCP 服务最初放在 `app/mcp/`。PyCharm 之类运行方式会把**脚本所在目录**
-（即 `app/`）连同仓库根一起放进 `sys.path`，于是 `import mcp` 解析到我们自己的 `app/mcp`
-（是包），`app/mcp/server.py` 里的 `from mcp.server.mcpserver import MCPServer` 就变成
+背景（真实事故）：MCP服务最初放在`app/mcp/`。PyCharm之类运行方式会把**脚本所在目录**
+（即`app/`）连同仓库根一起放进`sys.path`，于是`import mcp`解析到我们自己的`app/mcp`
+（是包），`app/mcp/server.py`里的`from mcp.server.mcpserver import MCPServer`就变成
 `'mcp.server' is not a package` —— 直接启动失败。
 
-这个坑在 pytest 下永远复现不出来：pytest 从仓库根以 `app.mcp` 的形式导入，顶层 `mcp`
-仍然是 SDK。因此本测试**必须用子进程**，在干净解释器里人为把 `app/` 放到 `sys.path` 前面，
+这个坑在pytest下永远复现不出来：pytest从仓库根以`app.mcp`的形式导入，顶层`mcp`
+仍然是SDK。因此本测试**必须用子进程**，在干净解释器里人为把`app/`放到`sys.path`前面，
 再检查这些第三方模块是否解析到了仓库内部。
 """
 import json
@@ -17,7 +17,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-# 容易被 app/ 下的同名子包遮蔽、且本项目实际依赖的顶层模块
+#容易被app/下的同名子包遮蔽、且本项目实际依赖的顶层模块
 PROBE_MODULES = (
     "mcp",
     "openai",
@@ -32,8 +32,8 @@ PROBE_MODULES = (
 
 
 def test_repo_packages_do_not_shadow_third_party_modules():
-    # 注意判据：不能只判断"路径在仓库内"——venv/ 就在仓库里，那样所有 site-packages
-    # 模块都会被误判为被遮蔽。真正的遮蔽是"从被加进 sys.path 的 app/ 目录解析出来"。
+    #判据不能只判断"路径在仓库内"——venv/就在仓库里，那样所有site-packages
+    #模块都会被误判为被遮蔽。真正的遮蔽是"从被加进sys.path的app/目录解析出来"。
     shadow_root = REPO_ROOT / "app"
     code = (
         "import importlib, json, sys\n"
@@ -46,15 +46,15 @@ def test_repo_packages_do_not_shadow_third_party_modules():
         "    try:\n"
         "        mod = importlib.import_module(name)\n"
         "    except Exception:\n"
-        "        continue\n"          # 没装的模块不参与判断
+        "        continue\n"          #没装的模块不参与判断
         "    path = getattr(mod, '__file__', '') or ''\n"
         "    if path.startswith(shadow_root):\n"
         "        shadowed[name] = path\n"
         "print(json.dumps(shadowed, ensure_ascii=False))\n"
         "raise SystemExit(1 if shadowed else 0)\n"
     )
-    # 不用 capture_output/PIPE：受限沙箱（Windows CreatePipe 被拒）里管道创建会直接失败，
-    # 而这里的验证只需要拿到子进程输出文本，重定向到临时文件即可，还避免了管道缓冲问题。
+    #不用capture_output/PIPE：受限沙箱（Windows CreatePipe被拒）里管道创建会直接失败，
+    #而这里的验证只需要拿到子进程输出文本，重定向到临时文件即可，还避免了管道缓冲问题。
     with tempfile.TemporaryDirectory() as tmp_dir:
         out_path = Path(tmp_dir) / "stdout.txt"
         err_path = Path(tmp_dir) / "stderr.txt"

@@ -1,8 +1,8 @@
-# """
+#"""
 #架构作用：工具名称、描述、schema、实现工厂及出口范围的唯一来源
 #调用方：配置的OpenAI适配器、FuncCallManager的图适配器及MCP Server
 #数据流：ToolSpec →适配器→带管理器闭包的函数→检索/模型/持久化服务
-# """
+#"""
 """
 tools/registry.py工具唯一注册表（唯一事实来源）
 
@@ -12,7 +12,7 @@ tools/registry.py工具唯一注册表（唯一事实来源）
     TOOL_REGISTRY
       ├─ app/tools/adapters/openai.py    →模型可见的OpenAI function载荷（config.TOOLS_SCHEMAS）
       ├─ app/tools/adapters/langgraph.py → LangChain工具对象（FuncCallManager._create_tools → ToolNode）
-      └─ app/mcp_server/server.py               → MCP Server的tools列表（R5：只暴露无状态工具）
+      └─ app/mcp_server/server.py               → MCP Server的tools列表（只暴露无状态工具）
 
 原app/config/tools_schemas.yaml的内容已原样迁移到本文件并删除该文件：留着那份yaml只会
 成为漂移陷阱（改了它不会被加载，也不会有任何提示）。需要人类可读快照时随时重新生成：
@@ -37,27 +37,27 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List
 
 #项目根（本文件位于app/tools/下，向上三级即项目根）；不取config.PROJECT_ROOT
-# 是为了避免config→注册表→config的循环导入，且路径语义与本文件位置天然一致
-# 只读工具的读取边界不在这里：实际根目录由FuncCallManager按READONLY_ROOTS（默认用户目录）注入
+#是为了避免config→注册表→config的循环导入，且路径语义与本文件位置天然一致
+#只读工具的读取边界不在这里：实际根目录由FuncCallManager按READONLY_ROOTS（默认用户目录）注入
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
-#注册表导入期的告警走标准logging（本文件不导入config，避免config→注册表→config循环导入）
+#注册表导入期的警告走标准logging（本文件不导入config，避免循环导入）
 logger = logging.getLogger(__name__)
 
 #作用域：internal只给内部模型与ToolNode；external额外通过MCP对外暴露
-#方案R5：save_memory / change_status依赖「当前存档」这类进程内状态，不对外暴露
+#save_memory / change_status依赖「当前存档」这类进程内状态，不对外暴露
 SCOPE_INTERNAL = "internal"
 SCOPE_EXTERNAL = "external"
 
 
-# """
+#"""
 #模块一：ToolSpec与参数schema工厂
 #一个工具=名字+模型可见的description + JSON Schema parameters +实现工厂+作用域；
 #这里是全项目工具定义的唯一事实来源，config.TOOLS_SCHEMAS与MCP出口都由它派生
-# """
+#"""
 @dataclass(frozen=True)
 class ToolSpec:
-    """一个工具的完整定义；description / parameters 就是模型可见的那一份。"""
+    """一个工具的完整定义；description / parameters就是模型可见的那一份。"""
 
     name: str
     description: str
@@ -67,7 +67,7 @@ class ToolSpec:
 
 
 def _query_parameters(description: str) -> Dict[str, Any]:
-    """只有一个必填 query 参数的 JSON Schema（与迁移前的 yaml 完全一致）。"""
+    """只有一个必填query参数的JSON Schema（与迁移前的yaml完全一致）。"""
     return {
         "type": "object",
         "properties": {"query": {"type": "string", "description": description}},
@@ -75,12 +75,12 @@ def _query_parameters(description: str) -> Dict[str, Any]:
     }
 
 
-# """
+#"""
 #模块二：工具实现闭包（impl工厂）
 #每个_bind_*返回一个可被ToolNode调用的协程；工厂只捕获管理器，不做事，真正副作用在被调用时
 #共性是延迟导入config / ddgs / status_rules以避免循环依赖与替身注入需求；
 #代价是副作用时机与执行线程都藏在闭包里，审查前写库的问题就在这里（见各函数行内标记）
-# """
+#"""
 def _bind_output_time(mgr):
     def output_time(str=""):
         return "现在时间是" + time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
@@ -131,7 +131,7 @@ def _bind_search_web(mgr):
         from app.config.config import config  #延迟导入：见模块docstring（避免循环导入）
         from ddgs import DDGS  #延迟导入：测试会用替身替换ddgs
 
-        # DDGS.text是同步调用，放进工作线程执行，避免在async工具内阻塞事件循环
+        #DDGS.text是同步调用，放进工作线程执行，避免在async工具内阻塞事件循环
         def _search():
             with DDGS() as ddgs:
                 return list(ddgs.text(query, max_results=config.SEARCH_MAX_RESULTS))
@@ -171,13 +171,13 @@ def _bind_change_status(mgr):
     return change_status
 
 
-# """
+#"""
 #模块三：注册表与访问器
 #列表顺序就是对外契约（测试按位置解包、ToolNode按名派发）；scope决定是否经MCP暴露
 #增删或换序必须同步适配器、MCP出口与相关测试
-# """
+#"""
 #顺序即对外契约：tests/unit/test_func_call_manager.py按位置解包前7个工具，
-# ToolNode也按顺序注册；增删/换序必须同步改测试（阶段2只读工具已追加在末尾）
+#ToolNode也按顺序注册；增删/换序必须同步改测试（只读工具追加在末尾）
 TOOL_REGISTRY: List[ToolSpec] = [
     ToolSpec(
         name="output_time",
@@ -265,13 +265,12 @@ TOOL_REGISTRY: List[ToolSpec] = [
 ]
 
 
-# """
-#模块三·附：agent_framework只读工具追加（阶段2接线，F6拍板=追加到末尾）
-# build_readonly_tool_specs内部延迟导入本模块取ToolSpec/SCOPE_INTERNAL，此处调用时
-# 本模块已定义完这两个名字，偏初始化模块也能取到；工具实现经mgr.readonly_tools取实例
-# （F4拍板=挂在FuncCallManager构造里），此处传入的workspace_root仅作文档语义；
-# 真正的读取边界由FuncCallManager的READONLY_ROOTS决定
-# """
+#"""
+#模块三·附：agent_framework只读工具追加到注册表末尾
+#build_readonly_tool_specs内部延迟导入本模块取ToolSpec/SCOPE_INTERNAL，此处调用时
+#本模块已定义完这两个名字；工具实现经mgr.readonly_tools取实例，
+#此处传入的workspace_root仅作文档语义，真正的读取边界由FuncCallManager的READONLY_ROOTS决定
+#"""
 from app.agent_framework.readonly.tool_specs import build_readonly_tool_specs
 
 TOOL_REGISTRY.extend(
@@ -280,12 +279,12 @@ TOOL_REGISTRY.extend(
 
 
 def tool_names() -> List[str]:
-    """注册表里的工具名，顺序即契约（测试按位置解包、ToolNode 按名派发）。"""
+    """注册表里的工具名，顺序即契约（测试按位置解包、ToolNode按名派发）。"""
     return [spec.name for spec in TOOL_REGISTRY]
 
 
 def get_spec(name: str) -> ToolSpec:
-    """按名字取定义；名字不存在直接抛 KeyError，避免静默降级。"""
+    """按名字取定义；名字不存在直接抛KeyError，避免静默降级。"""
     for spec in TOOL_REGISTRY:
         if spec.name == name:
             return spec
@@ -293,19 +292,18 @@ def get_spec(name: str) -> ToolSpec:
 
 
 def external_specs() -> List[ToolSpec]:
-    """对外（MCP）暴露的工具：方案 R5 只暴露无状态工具。"""
+    """对外（MCP）暴露的无状态工具。"""
     return [spec for spec in TOOL_REGISTRY if spec.scope == SCOPE_EXTERNAL]
 
 
-# """
-#模块三·附二：MCP stdio 客户端接线（阶段5接线，F5拍板=stdio传输）
-# server清单读 data/mcp_servers.json（json直读，不import config——config.py:158反向
-# 依赖本模块，import即循环）；文件缺失/无servers→MCP_CLIENT为NotConfigured占位实现，
-# 注册表不追加任何工具，行为与接线前完全一致；
-# 配置形状：{"servers": [{"name","command","args":[...],"env":{...},"timeout":30}]}
-# 限制：tool_bridge的impl经mgr.mcp_client取单一客户端，多server只会用第一份配置
-# 与既有名字的冲突在extend前检查（_resolve_name只解决MCP内部冲突）：冲突项跳过并告警
-# """
+#"""
+#模块三·附二：MCP stdio客户端接线
+#server清单读data/mcp_servers.json（json直读，不import config——config反向依赖本模块，
+#import即循环）；文件缺失/无servers→MCP_CLIENT为NotConfigured占位实现，注册表不追加任何工具；
+#配置形状：{"servers": [{"name","command","args":[...],"env":{...},"timeout":30}]}
+#限制：tool_bridge的impl经mgr.mcp_client取单一客户端，多server只会用第一份配置
+#与既有名字的冲突在extend前检查（_resolve_name只解决MCP内部冲突）：冲突项跳过并记录警告
+#"""
 import json as _json
 
 from app.agent_framework.mcp_client.client import NotConfiguredMcpClient
@@ -314,13 +312,13 @@ from app.agent_framework.mcp_client.tool_bridge import build_mcp_tool_specs
 
 
 def _build_mcp_client():
-    """按 data/mcp_servers.json 构造 MCP 客户端；未配置时返回显式失败的占位实现。"""
+    """按data/mcp_servers.json构造MCP客户端；未配置时返回显式失败的占位实现。"""
     config_path = PROJECT_ROOT / "data" / "mcp_servers.json"
     try:
         servers = _json.loads(config_path.read_text(encoding="utf-8")).get("servers") or []
     except FileNotFoundError:
         servers = []
-    except Exception as exc:  # 配置文件损坏不应拖垮整个注册表导入
+    except Exception as exc:  #配置文件损坏不应拖垮整个注册表导入
         logger.warning("[mcp_client] 读取 %s 失败，按未配置处理：%s", config_path, exc)
         servers = []
     if not servers:
@@ -340,7 +338,7 @@ def _build_mcp_client():
 MCP_CLIENT = _build_mcp_client()
 """进程级 MCP 客户端单例：注册表桥接与 FuncCallManager.mcp_client 共用同一份配置。"""
 
-_mcp_specs = build_mcp_tool_specs(MCP_CLIENT)  # 失败（含未配置）返回空列表
+_mcp_specs = build_mcp_tool_specs(MCP_CLIENT)  #失败（含未配置）返回空列表
 _known_names = set(tool_names())
 for _spec in _mcp_specs:
     if _spec.name in _known_names:
@@ -349,7 +347,6 @@ for _spec in _mcp_specs:
     _known_names.add(_spec.name)
     TOOL_REGISTRY.append(_spec)
 
-# [总审计 2026-11-13] P2 已修复：导入期告警由 print 改为 logging.warning（logger.warning），
-# 不引入 config 依赖以保持“注册表可先于 config 导入”的无环约束。
-# PASS：原 7 个工具的名称与顺序逐字未动，只读工具（read_file/list_dir/glob/grep）仅追加在末尾，
-# MCP 外部工具去重后追加且 scope=SCOPE_EXTERNAL。
+#导入期警告经logging.warning记录；注册表不导入config以保持可先于config导入。
+#前7个核心工具的名称与顺序固定；只读工具（read_file/list_dir/glob/grep）追加在末尾；
+#MCP外部工具去重后追加且scope=SCOPE_EXTERNAL。

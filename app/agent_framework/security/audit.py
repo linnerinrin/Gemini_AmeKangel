@@ -1,8 +1,8 @@
-# """
-#架构作用：阶段0审计落点模块，AuditSinkPort的两个默认实现
-#调用方：未来适配器在敏感动作（切模型/切会话/鉴权失败等）处调用record(event)
+#"""
+#架构作用：审计落点模块，AuditSinkPort的两个默认实现
+#调用方：适配器在敏感动作（切模型/切会话/鉴权失败等）处调用record(event)
 #数据流：AuditEvent →补时间戳→内存deque留存/ print脱敏摘要
-# """
+#"""
 """
 agent_framework/security/audit.py审计落点（骨架）
 
@@ -27,7 +27,7 @@ _SENSITIVE_KEYS = frozenset({"api_key", "apikey", "token", "secret", "password",
 
 
 def _sanitize_detail(event: AuditEvent) -> str:
-    """detail 脱敏摘要：只保留键名与安全值，敏感键值替换为 ***。"""
+    """detail脱敏摘要：只保留键名与安全值，敏感键值替换为***。"""
     if not event.detail:
         return "-"
     parts = []
@@ -43,14 +43,14 @@ def _sanitize_detail(event: AuditEvent) -> str:
 
 
 def _with_timestamp(event: AuditEvent) -> AuditEvent:
-    """timestamp 为 0 时用 time.time() 补齐；frozen 数据类走 replace。"""
+    """timestamp为0时用time.time()补齐；frozen数据类走replace。"""
     if event.timestamp and event.timestamp > 0:
         return event
     return dataclasses.replace(event, timestamp=time.time())
 
 
 class InMemoryAuditSink(AuditSinkPort):
-    """内存环形审计落点：最多留存 1000 条，超出自动丢弃最旧。"""
+    """内存环形审计落点：最多留存1000条，超出自动丢弃最旧。"""
 
     def __init__(self, maxlen: int = 1000) -> None:
         self._events: Deque[AuditEvent] = deque(maxlen=maxlen)
@@ -64,7 +64,7 @@ class InMemoryAuditSink(AuditSinkPort):
             pass
 
     def tail(self, n: int = 50) -> List[AuditEvent]:
-        """读取最近 n 条事件（按时间升序返回）。"""
+        """读取最近n条事件（按时间升序返回）。"""
         if n <= 0:
             return []
         items = list(self._events)
@@ -72,7 +72,7 @@ class InMemoryAuditSink(AuditSinkPort):
 
 
 class PrintAuditSink(AuditSinkPort):
-    """print 审计落点：一行脱敏摘要，对齐原项目 print 日志风格。"""
+    """print审计落点：一行脱敏摘要，对齐原项目print日志风格。"""
 
     def record(self, event: AuditEvent) -> None:
         """打印一行审计摘要；打印失败静默吞掉，绝不影响主流程。"""

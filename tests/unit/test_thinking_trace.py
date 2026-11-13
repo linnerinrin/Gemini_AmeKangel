@@ -57,7 +57,7 @@ def test_encode_decode_round_trip():
 
     assert json.loads(raw) == {"v": 1, "items": items}
     assert decode(raw) == items
-    # 没有思考内容时写 NULL，而不是空数组
+    #没有思考内容时写NULL，而不是空数组
     assert encode([]) is None
     assert encode(None) is None
 

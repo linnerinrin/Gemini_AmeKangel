@@ -1,8 +1,8 @@
-# """
-#架构作用：阶段0出站URL校验模块，EgressGuardPort的默认实现
-#调用方：未来适配器在发起任何外发请求前调用allow(url)做只读判定
+#"""
+#架构作用：出站URL校验模块，EgressGuardPort的默认实现
+#调用方：适配器在发起任何外发请求前调用allow(url)做只读判定
 #数据流：候选url → urllib.parse解析→协议/IP/主机名规则判定→ True/False
-# """
+#"""
 """
 agent_framework/security/egress_guard.py出站URL校验（SSRF防线）
 
@@ -11,10 +11,10 @@ agent_framework/security/egress_guard.py出站URL校验（SSRF防线）
 -主机解析为IP时拒绝回环（127.0.0.0/8、::1）、内网段（10/8、172.16/12、
   192.168/16）、链路本地（含169.254.0.0/16，覆盖云元数据169.254.169.254）；
 -主机名localhost及其子域一律拒绝；
--域名经DNS解析校验（F7已拍板）：任一解析结果命中危险网段即拒绝；
-  解析失败时告警放行（对齐llm_settings既有语义，离线/测试环境不致误杀）；
--任何解析失败都不抛异常：DNS解析失败/无结果时告警放行（fail-open，与llm_settings一致）；
-  已知残余风险：解析与真正连接之间存在DNS rebinding的TOCTOU窗口
+-域名经DNS解析校验：任一解析结果命中危险网段即拒绝；
+  解析失败时打印提示并放行（离线/测试环境不致误杀）；
+-任何解析失败都不抛异常：DNS解析失败/无结果时打印提示并放行（fail-open，与llm_settings一致）；
+  解析与真正连接之间存在DNS rebinding的TOCTOU窗口
 """
 from __future__ import annotations
 
@@ -25,9 +25,9 @@ from urllib.parse import urlparse
 
 from ..contracts import EgressGuardPort
 
-# """
-#常量区：协议白名单与内置危险网段；全部不可变，便于审计与测试
-# """
+#"""
+#常量区：协议白名单与内置危险网段
+#"""
 
 _ALLOWED_SCHEMES: FrozenSet[str] = frozenset({"http", "https"})
 
@@ -50,7 +50,7 @@ _LOCAL_HOSTNAMES: FrozenSet[str] = frozenset({"localhost", "localhost.localdomai
 
 
 class EgressGuard(EgressGuardPort):
-    """EgressGuardPort 的默认实现：纯规则判定，无网络依赖、无状态。"""
+    """EgressGuardPort的默认实现：纯规则判定，无网络依赖、无状态。"""
 
     def __init__(self, extra_allowed_hosts: Optional[Iterable[str]] = None) -> None:
         """可选注入额外主机白名单（小写归一化后精确匹配放行）。"""
@@ -59,16 +59,16 @@ class EgressGuard(EgressGuardPort):
         )
 
     def allow(self, url: str) -> bool:
-        """url 允许外发返回 True，否则 False；任何异常一律拒绝。"""
+        """url允许外发返回True，否则False；任何异常一律拒绝。"""
         try:
             return self._allow_inner(url)
         except Exception:
             #判定失败不得外抛，失败即拒绝
             return False
 
-    # """
+    #"""
     #内部判定：协议→主机提取→白名单→ IP/主机名规则，逐层收紧
-    # """
+    #"""
 
     def _allow_inner(self, url: str) -> bool:
         if not url or not isinstance(url, str):
@@ -89,19 +89,18 @@ class EgressGuard(EgressGuardPort):
         if host in _LOCAL_HOSTNAMES or host.endswith(".localhost"):
             return False
 
-        #能解析为IP字面量的，走网段规则；解析不出的是域名，做DNS解析校验（F7已拍板）：
-        #任一解析结果落入回环/内网/链路本地即拒绝，解析失败按fail-closed拒绝，
+        #能解析为IP字面量的，走网段规则；解析不出的是域名，做DNS解析校验：
+        #任一解析结果落入回环/内网/链路本地即拒绝，解析失败放行，
         #防止DNS rebinding把公网域名切到内网地址
         ip = self._parse_ip(host)
         if ip is not None:
             return not self._is_blocked_ip(ip)
         return self._resolve_allowed(host)
 
-    # """
+    #"""
     #域名解析校验：getaddrinfo全量结果逐一过网段规则，命中危险网段即拒绝；
-    #解析失败/无结果时告警放行（对齐llm_settings._assert_public_host既有语义：
-    #离线/测试环境常见，且连不出去的地址本身发不出请求）
-    # """
+    #解析失败/无结果时打印提示并放行（离线/测试环境常见，连不出去的地址本身发不出请求）
+    #"""
     @staticmethod
     def _resolve_allowed(host: str) -> bool:
         try:
@@ -126,13 +125,13 @@ class EgressGuard(EgressGuardPort):
 
     @staticmethod
     def _parse_ip(host: str) -> Optional[ipaddress._BaseAddress]:
-        """尝试把主机解析为 IP 字面量；域名返回 None。"""
+        """尝试把主机解析为IP字面量；域名返回None。"""
         try:
             return ipaddress.ip_address(host)
         except ValueError:
             pass
-        #审计修复：inet_aton形态（十进制/十六进制/八进制/缩写点分，如
-        # 2130706433、0x7f000001、0177.0.0.1、127.1）会被解析器认成127.0.0.1，
+        #inet_aton形态（十进制/十六进制/八进制/缩写点分，如
+        #2130706433、0x7f000001、0177.0.0.1、127.1）会被解析器认成127.0.0.1，
         #必须识别后走网段规则，否则构成SSRF绕过
         try:
             packed = socket.inet_aton(host)
@@ -149,5 +148,4 @@ class EgressGuard(EgressGuardPort):
             return True
         return any(ip in net for net in _BLOCKED_NETWORKS)
 
-# [总审计 2026-11-13] P2：模块 docstring 称“解析失败一律返回 False”，实际在 :109-112 打印告警后返回 True
-# （fail-open），二者矛盾，需明确策略并同步注释；另外校验与真正建连之间存在 DNS rebinding TOCTOU（F7 未关闭）。
+#解析失败打印告警后返回True（fail-open放行）；校验与真正建连之间存在DNS rebinding TOCTOU窗口。

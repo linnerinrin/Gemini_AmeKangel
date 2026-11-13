@@ -16,7 +16,7 @@ names = ['windowbase_active', 'windowbase_inactive']
 
 for name in names:
     img = Image.open(os.path.join(SRC, name + '.png'))
-    w, h = img.size  # 300, 200
+    w, h = img.size  #300, 200
 
     header = img.crop((0, 0, w, 40))
     body   = img.crop((0, 40, w, 180))

@@ -28,7 +28,7 @@ def test_generation_result_stringifies_content():
 
 def test_init_sets_tools_from_config():
     mgr = model_module.ModelManager.__new__(model_module.ModelManager)
-    # tools should be set in __init__ from config.TOOLS_SCHEMAS
+    #tools should be set in __init__ from config.TOOLS_SCHEMAS
     assert not hasattr(mgr, 'bind_tools'), "bind_tools should not exist"
 
 
@@ -60,7 +60,7 @@ def make_tool_call(name, arguments, call_id="call-1"):
 
 
 def test_init_exposes_model_meta_attributes():
-    """R12：厂商/模型属性任何时候都可读（还没生成过就是 None）"""
+    """厂商/模型属性任何时候都可读（还没生成过就是None）"""
     mgr = model_module.ModelManager()
 
     assert mgr.last_provider is None
@@ -68,7 +68,7 @@ def test_init_exposes_model_meta_attributes():
 
 
 def test_generate_records_resolved_provider_and_model(monkeypatch):
-    """记录的是本次实际解析出的厂商/模型（resolve_profile 的结果）"""
+    """记录的是本次实际解析出的厂商/模型（resolve_profile的结果）"""
     message = types.SimpleNamespace(content="answer", tool_calls=[])
     mgr = model_module.ModelManager.__new__(model_module.ModelManager)
     mgr.client = FakeClient(message)
@@ -82,12 +82,12 @@ def test_generate_records_resolved_provider_and_model(monkeypatch):
 
     assert mgr.last_provider == "openai"
     assert mgr.last_model == "gpt-4o-mini"
-    # 发给 API 的也是解析出来的这个模型，而不是 config.DEEPSEEK_MODEL
+    #发给API的也是解析出来的这个模型，而不是config.DEEPSEEK_MODEL
     assert mgr.client.chat.completions.calls[0]["model"] == "gpt-4o-mini"
 
 
 def test_injected_client_records_no_provider_or_model():
-    """替身客户端没有真实厂商可记录时如实写 None，不瞎猜默认模型"""
+    """替身客户端没有真实厂商可记录时如实写None，不瞎猜默认模型"""
     message = types.SimpleNamespace(content="answer", tool_calls=[])
     mgr = model_module.ModelManager.__new__(model_module.ModelManager)
     mgr.client = FakeClient(message)

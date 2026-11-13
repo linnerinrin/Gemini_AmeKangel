@@ -1,8 +1,8 @@
-# """
+#"""
 #架构作用：为工具和会话提供知识/对话检索，召回后用交叉编码器重排
 #数据流：本地文本或聊天轮→ Document → FAISS →相似度召回→重排→提示词文本
 #生命周期：由managers包导入时创建；模型与索引在进程内共享，不持久化到数据库
-# """
+#"""
 """
 managers/RAGManager.py检索增强生成管理器
 Abstract on IRAG
@@ -19,10 +19,10 @@ from app.interfaces import IRAG
 
 
 class RAGManager(IRAG):
-    # """
+    #"""
     #同步加载embedding与cross-encoder；前者向量化，后者对候选逐对打分
-    # """
-    #阶段0会话运行时接入：每会话一个RAGManager实例（context索引按档隔离），
+    #"""
+    #每会话一个RAGManager实例（context索引按档隔离），
     #但编码器模型很重，进程内只加载一次，全实例共享同一份权重对象
     _shared_bi_encoder = None
     _shared_cross_encoder = None
@@ -38,7 +38,7 @@ class RAGManager(IRAG):
         self.bi_encoder=RAGManager._shared_bi_encoder
         #双编码器用于rerank（同上，共享权重）
         if RAGManager._shared_cross_encoder is None:
-            #sentence-transformers 5.x：model_name 参数已更名，旧名会告警
+            #sentence-transformers 5.x的参数名为model_name_or_path
             RAGManager._shared_cross_encoder=CrossEncoder(model_name_or_path=config.cross_encoder_dir).to(config.RAG_DEVICE)
         self.cross_encoder=RAGManager._shared_cross_encoder
 
@@ -61,18 +61,18 @@ class RAGManager(IRAG):
         #换绑存档只改过滤口径，不动索引；各档聊天互不召回
         self.current_session_id = session_id
 
-    # """
+    #"""
     #场景变化只替换knowledge索引，context索引保留
-    # """
+    #"""
     def load_mode(self,mode:str):
         self.current_mode = mode
         self.knowledge = config.knowledge_prompt[mode]
         self.read_knowledge()
 
     #读知识库初始化向量库
-    # """
+    #"""
     #按非空行切文档并完整重建知识向量库；文件IO与embedding都在当前线程执行
-    # """
+    #"""
     def read_knowledge(self)->None:
         chunks = []
         with open(str(self.knowledge),"r",encoding="utf-8") as f:
@@ -81,11 +81,11 @@ class RAGManager(IRAG):
                 if line.strip(): chunks.append(Document(line))
         self.vector_store["knowledge"] = FAISS.from_documents(chunks, self.bi_encoder)
 
-    # """
+    #"""
     #将完整问答编码成文档；空库初始化，已有库追加，没有按会话分区或删除旧会话
-    # """
+    #"""
     def update_context(self,context:list)->None:
-        # load_mode之前current_mode为None，标注退回默认场景而不是抛AttributeError
+        #load_mode之前current_mode为None，标注退回默认场景而不是抛AttributeError
         mode_label = self.current_mode if self.current_mode is not None else config.INITIAL_MODE
         #未绑定存档不入context索引，避免无档聊天串进别的存档
         if not self.current_session_id:
@@ -124,9 +124,9 @@ class RAGManager(IRAG):
                 self._context_doc_ids={}
 
     #召回单编码器粗筛效率高召回率低
-    # """
+    #"""
     #根据caller选knowledge/context，空索引返回空候选；向量召回仅产生原始文本列表
-    # """
+    #"""
     def recall(self,query:str,caller:str)->list:
         #计算与查询相似度最高的几个向量返回文档
         store = self.vector_store.get(caller)
@@ -144,10 +144,10 @@ class RAGManager(IRAG):
         return documents
 
     #重排双编码器精排效率高召回率高
-    # """
+    #"""
     #对候选以查询-文本对打分，按corpus_id回取文本，返回prompts/value字典列表
     #重排不构成来源可信性检查，文本仍可能包含来自用户或工具的指令性内容
-    # """
+    #"""
     def rerank(self,query:str,documents:list)->list:
         final_result=[]
         #用双编码器计算召回结果与相似度最高的几个向量返回文档
@@ -162,10 +162,10 @@ class RAGManager(IRAG):
         return final_result
 
     #检索异步召回+重排
-    # """
+    #"""
     #召回和重排分别在线程池执行，await后拼接提示文本；线程卸载只覆盖这两步
     #建库/追加索引仍同步执行，共享模型与索引没有按会话独立实例
-    # """
+    #"""
     async def retrieve(self, query: str, caller: str = "knowledge") -> str:
         rag_prompt = ""
         recall_result = await asyncio.to_thread(self.recall, query, caller)

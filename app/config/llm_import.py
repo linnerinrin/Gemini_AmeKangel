@@ -1,8 +1,8 @@
-# """
+#"""
 #架构作用：兼容加载LLM设置服务模块，规避测试替身包结构和服务导入环
 #调用方：API/schema/config在需要时调用load_llm_settings
 #数据流：文件路径→ importlib spec → sys.modules单例；加载后由Python执行模块
-# """
+#"""
 """
 config/llm_import.py安全加载app/services/llm_settings.py
 
@@ -29,7 +29,7 @@ def _module_path() -> Path:
 
 
 def load_llm_settings():
-    """返回 settings 服务模块（模块级单例）。"""
+    """返回settings服务模块（模块级单例）。"""
     existing = sys.modules.get(MODULE_NAME)
     if existing is not None:
         return existing

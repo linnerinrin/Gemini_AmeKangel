@@ -1,9 +1,9 @@
-"""工具 schema 与工厂实现必须同名。
+"""工具schema与工厂实现必须同名。
 
-config.TOOLS_SCHEMAS（由 app/tools/registry.py 经 adapters/openai.py 派生）是模型可见定义，
-同时是 ModelManager._validate_tools 的白名单来源；FuncCallManager._create_tools
-（由同一注册表经 adapters/langgraph.py 派生）是实际执行体。两者一旦不同步（例如
-change_emotion -> change_status 只改了一处），模型调用会被判定为"工具未注册"而整轮失败。
+config.TOOLS_SCHEMAS（由app/tools/registry.py经adapters/openai.py派生）是模型可见定义，
+同时是ModelManager._validate_tools的白名单来源；FuncCallManager._create_tools
+（由同一注册表经adapters/langgraph.py派生）是实际执行体。两者一旦不同步（例如
+change_emotion -> change_status只改了一处），模型调用会被判定为"工具未注册"而整轮失败。
 """
 from conftest import load_source_module
 
@@ -12,7 +12,7 @@ def _created_tool_names():
     module = load_source_module("func_call_manager_schema_sync", "app/managers/FuncCallManager.py")
     mgr = module.FunctionCallManager()
     mgr.init(rag_mgr=object(), memory_mgr=object(), model_mgr=object())
-    # 真实 langchain 工具暴露 .name；测试替身装饰器下退回函数名
+    #真实langchain工具暴露.name；测试替身装饰器下退回函数名
     return sorted(getattr(tool, "name", None) or tool.__name__ for tool in mgr.tools)
 
 
@@ -31,7 +31,7 @@ def test_declared_schema_names_match_created_tools():
 
 
 def test_status_tool_is_declared():
-    """状态工具必须作为 change_status 出现，且三个方向参数齐全。"""
+    """状态工具必须作为change_status出现，且三个方向参数齐全。"""
     from app.config.config import config
 
     entry = next(

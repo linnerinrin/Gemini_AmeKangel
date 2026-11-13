@@ -1,10 +1,10 @@
-# """
-#架构作用：model_adapter子包的包边界；阶段5模型调用适配模块的集合入口说明
+#"""
+#架构作用：model_adapter子包的包边界；模型调用适配模块的集合入口说明
 #调用方：调用方按需导入具体模块（from .client import OpenAICompatibleChatClient）
 #本文件仅说明职责与依赖方向，无独立执行数据流
-# """
+#"""
 """
-agent_framework/model_adapter子包：阶段5模型调用适配（纯新增，未接入运行路径）
+agent_framework/model_adapter子包：模型调用适配（纯新增，未接入运行路径）
 
 - client.py   OpenAI兼容聊天客户端：OpenAICompatibleChatClient
               （ChatClientPort默认实现，非流式chat/completions）

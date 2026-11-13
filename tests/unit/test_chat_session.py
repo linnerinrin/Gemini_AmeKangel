@@ -90,7 +90,7 @@ class FakeMemory:
 
     def update_short_memory(self, prompt, reply, thinking=None, model=None, provider=None):
         self.last_short = (prompt, reply, thinking)
-        # 这一轮透传下来的实际模型（R12）：拿不到就是 (None, None)
+        #这一轮透传下来的实际模型：拿不到就是(None, None)
         self.last_model_meta = (provider, model)
         self.history.extend([
             {"role": "user", "content": prompt},
@@ -123,7 +123,7 @@ def _order_of(prompt, *segments):
 
 
 def test_initial_prompts_follow_base_role_task_order(monkeypatch):
-    """三个节点属性在构造后就是按 mode 装配好的"""
+    """三个节点属性在构造后就是按mode装配好的"""
     session = make_session(monkeypatch)
 
     assert session.call_prompt == chat_module.config.call_prompt_for()
@@ -132,13 +132,13 @@ def test_initial_prompts_follow_base_role_task_order(monkeypatch):
     role = chat_module.config.ROLE_PROMPT[session.current_mode]
     task = chat_module.config.TASK_PROMPT
     assert session.sys_prompt == chat_module.config.join_prompt(base, role, task)
-    # 顺序必须是 base -> role -> task
+    #顺序必须是base -> role -> task
     positions = _order_of(session.sys_prompt, base, role, task)
     assert positions == sorted(positions), f"装配顺序不是 base->role->task: {positions}"
 
 
 def test_load_mode_rebuilds_role_segment(monkeypatch):
-    """场景轴变化只换 role 段"""
+    """场景轴变化只换role段"""
     session = make_session(monkeypatch)
     asyncio.run(session.single_chat("hello"))
     task = chat_module.config.TASK_PROMPT
@@ -168,7 +168,7 @@ def test_single_chat_updates_memory_and_history(monkeypatch):
 
     assert reply == "reply"
     assert think == "think"
-    # 非流式路径没有事件，思考文本要包成文本项一起入库
+    #非流式路径没有事件，思考文本要包成文本项一起入库
     assert session.memory_mgr.last_short == (
         "hello", "reply", [{"kind": "text", "text": "think"}],
     )
@@ -180,7 +180,7 @@ def test_single_chat_updates_memory_and_history(monkeypatch):
 
 
 def test_single_chat_passes_actual_model_meta_to_memory(monkeypatch):
-    """R12：每轮落库要带上 ModelManager 实际解析出的厂商/模型，而不是配置里的静态值"""
+    """每轮落库要带上ModelManager实际解析出的厂商/模型，而不是配置里的静态值"""
     session = make_session(monkeypatch)
     session.model_mgr.last_provider = "openai"
     session.model_mgr.last_model = "gpt-4o-mini"
@@ -201,8 +201,8 @@ def test_stream_chat_passes_actual_model_meta_to_memory(monkeypatch):
 
 
 def test_missing_model_meta_is_passed_as_none(monkeypatch):
-    """拿不到模型信息时写 None，不能因此报错挡住落库"""
-    session = make_session(monkeypatch)  # FakeModel 上没有任何 last_* 属性
+    """拿不到模型信息时写None，不能因此报错挡住落库"""
+    session = make_session(monkeypatch)  #FakeModel上没有任何last_*属性
 
     asyncio.run(session.single_chat("hello"))
 
@@ -248,7 +248,7 @@ def test_stream_approved_reply_saved_once_then_done(monkeypatch):
 
 
 def test_stream_chat_persists_structured_thinking_trace(monkeypatch):
-    """流式对话要把思考事件累积成结构化 trace 一起入库，历史才能回放同样的折叠块"""
+    """流式对话要把思考事件累积成结构化trace一起入库，历史才能回放同样的折叠块"""
     session = make_session(monkeypatch)
     saved = []
     session.update_memory = lambda *args, **kwargs: saved.append(args)
@@ -278,13 +278,13 @@ def test_stream_chat_persists_structured_thinking_trace(monkeypatch):
         {"kind": "tool_call", "name": "search_web"},
         {"kind": "node", "name": "generate_reply"},
     ])]
-    # trace 只收集思考类事件，正文/状态照旧转发给前端
+    #trace只收集思考类事件，正文/状态照旧转发给前端
     assert emitted == ["status", "status", "node", "thinking_delta", "thinking_delta",
                        "tool_call", "node", "answer_delta", "done"]
 
 
 def test_stream_chat_without_events_still_captures_trace(monkeypatch):
-    """on_event 为空（内部调用）时也要累积 trace，只是不往外发"""
+    """on_event为空（内部调用）时也要累积trace，只是不往外发"""
     session = make_session(monkeypatch)
     saved = []
     session.update_memory = lambda *args, **kwargs: saved.append(args)

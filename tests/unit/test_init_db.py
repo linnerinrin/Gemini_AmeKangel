@@ -1,4 +1,4 @@
-"""建表与迁移：thinking/llm_model/llm_provider 列的幂等补充，失败不能挡住启动"""
+"""建表与迁移：thinking/llm_model/llm_provider列的幂等补充，失败不能挡住启动"""
 import pymysql
 import pytest
 
@@ -43,7 +43,7 @@ def test_migrate_adds_column_and_commits(monkeypatch):
 
 
 def test_migrate_treats_duplicate_column_as_ready(monkeypatch):
-    """并发启动或已有列时，1060 等价于迁移成功。"""
+    """并发启动或已有列时，1060等价于迁移成功。"""
     schema_module.reset_state_for_tests()
     fake_db = FakeDB(error=pymysql.err.OperationalError(1060, "Duplicate column name 'thinking'"))
     monkeypatch.setattr(init_db_module, "db", fake_db)
@@ -55,7 +55,7 @@ def test_migrate_treats_duplicate_column_as_ready(monkeypatch):
 
 
 def test_migrate_adds_llm_model_and_provider_columns(monkeypatch):
-    """R12：chat 表要补 llm_model / llm_provider 两列（老库靠幂等 ALTER）"""
+    """chat表要补llm_model / llm_provider两列（老库靠幂等ALTER）"""
     schema_module.reset_state_for_tests()
     fake_db = FakeDB()
     monkeypatch.setattr(init_db_module, "db", fake_db)
@@ -68,7 +68,7 @@ def test_migrate_adds_llm_model_and_provider_columns(monkeypatch):
 
 
 def test_llm_column_migration_is_idempotent(monkeypatch):
-    """重复列（1060）视为迁移成功；失败不能被缓存成 ready。"""
+    """重复列（1060）视为迁移成功；失败不能被缓存成ready。"""
     schema_module.reset_state_for_tests()
     duplicate_db = FakeDB(error=pymysql.err.OperationalError(1060, "Duplicate column name 'llm_model'"))
     monkeypatch.setattr(init_db_module, "db", duplicate_db)
@@ -89,11 +89,11 @@ def test_llm_column_migration_is_idempotent(monkeypatch):
     assert init_db_module.migrate() is False
     assert schema_module._llm_model_ready is False
     assert schema_module._llm_provider_ready is False
-    assert schema_module._ready is True       # 前面的列已就绪，不受影响
+    assert schema_module._ready is True       #前面的列已就绪，不受影响
 
 
 def test_migration_failure_leaves_state_retryable(monkeypatch, capsys):
-    """失败不能被缓存为 ready，后续调用必须重试。"""
+    """失败不能被缓存为ready，后续调用必须重试。"""
     schema_module.reset_state_for_tests()
     failed_db = FakeDB(error=pymysql.err.OperationalError(1045, "Access denied"))
     good_db = FakeDB()
@@ -108,7 +108,7 @@ def test_migration_failure_leaves_state_retryable(monkeypatch, capsys):
 
 
 def test_startup_migration_failure_fails_fast(monkeypatch):
-    """应用启动不能继续到接收请求，却在 INSERT 时才因缺列失败。"""
+    """应用启动不能继续到接收请求，却在INSERT时才因缺列失败。"""
     schema_module.reset_state_for_tests()
     fake_db = FakeDB(error=pymysql.err.OperationalError(1045, "Access denied"))
     monkeypatch.setattr(init_db_module, "db", fake_db)
@@ -131,7 +131,7 @@ def test_init_creates_table_with_thinking_column(monkeypatch):
 
 
 def test_init_creates_table_with_llm_columns(monkeypatch):
-    """R12：新库建表就带 llm_model / llm_provider，且紧跟在场景轴 mode 之后。"""
+    """新库建表就带llm_model / llm_provider，且紧跟在场景轴mode之后。"""
     schema_module.reset_state_for_tests()
     fake_db = FakeDB()
     monkeypatch.setattr(init_db_module, "db", fake_db)
@@ -148,7 +148,7 @@ def test_init_creates_table_with_llm_columns(monkeypatch):
 
 
 def test_importing_init_db_has_no_side_effects(monkeypatch):
-    """import 不能顺手连库：以前模块级直接 init()，测试一导入就会去连 MySQL"""
+    """import不能顺手连库：以前模块级直接init()，测试一导入就会去连MySQL"""
     fake_db = FakeDB()
     monkeypatch.setattr(init_db_module, "db", fake_db)
     fake_db.calls.clear()

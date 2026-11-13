@@ -8,9 +8,8 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 STATIC_ROOT = PROJECT_ROOT / "static"
 
-# 每个 node 子进程的上限。必须存在：node --check 与 *_behavior.cjs 在遇到半成品/
-# 写坏的文件时可能既不退出也不报错，没有超时就是整个 pytest 进程静默挂死
-# （本项目已发生过两次，各 >10 分钟且输出为空）。
+#每个node子进程的上限。必须存在：node --check与*_behavior.cjs在遇到半成品/
+#写坏的文件时可能既不退出也不报错，没有超时就是整个pytest进程静默挂死
 NODE_TIMEOUT_SECONDS = 60
 
 
@@ -59,8 +58,8 @@ def test_assets_are_categorized():
 
 def test_javascript_syntax_check():
     for path in sorted((STATIC_ROOT / "js").rglob("*.js")):
-        # 必须带 timeout：node --check 遇到被写坏/半成品的文件可能不退出也不报错，
-        # 没有超时会静默挂住整个 pytest（重定向到文件时连一个字都看不到）。
+        #必须带timeout：node --check遇到被写坏/半成品的文件可能不退出也不报错，
+        #没有超时会静默挂住整个pytest（重定向到文件时连一个字都看不到）。
         try:
             result = subprocess.run(
                 ["node", "--check", str(path.relative_to(PROJECT_ROOT))],
@@ -78,17 +77,17 @@ def test_javascript_syntax_check():
 
 
 def test_frontend_behavior_suites():
-    """把 tests/*_behavior.cjs 纳入 pytest。
+    """把tests/*_behavior.cjs纳入pytest。
 
-    这些行为测试此前只能手动运行，回归时会被漏掉（node --check 只查语法，
+    这些行为测试纳入pytest统一执行（node --check只查语法，
     查不出"帧表缺动作"这类静默退化）。
     """
     suites = sorted((PROJECT_ROOT / "tests").glob("*_behavior.cjs"))
     assert suites, "未找到任何前端行为测试"
 
     for suite in suites:
-        # 同 test_javascript_syntax_check：行为脚本里含 fake 定时器与 await，
-        # 一旦逻辑写错会永久等待，没有超时就是整个测试进程挂死。
+        #同test_javascript_syntax_check：行为脚本里含fake定时器与await，
+        #一旦逻辑写错会永久等待，没有超时就是整个测试进程挂死。
         try:
             result = subprocess.run(
                 ["node", str(suite.relative_to(PROJECT_ROOT))],

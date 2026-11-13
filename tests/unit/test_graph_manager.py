@@ -208,7 +208,7 @@ def test_reflection_node_accepts_or_returns_feedback():
 
 
 def test_reflection_verdict_is_pushed_to_the_thinking_chain():
-    """reflection 的判定结果必须出现在前端思考链里（debug 15）"""
+    """reflection的判定结果必须出现在前端思考链里（debug 15）"""
     session = make_session([types.SimpleNamespace(content="需要修改：fix tone", tool_calls=[], finish_reason="stop")])
     mgr = make_manager(session)
     events = []
@@ -311,7 +311,7 @@ def test_agent_rejects_truncated_tool_calls_before_routing():
 
 
 def node_prompt_sessions(sys_prompt):
-    """桩 session：三个节点提示词都从 session 上读，便于断言"""
+    """桩session：三个节点提示词都从session上读，便于断言"""
     agent_session = types.SimpleNamespace(
         call_prompt="call-prompt",
         sys_prompt=sys_prompt,
@@ -340,7 +340,7 @@ def node_prompt_sessions(sys_prompt):
 
 
 def test_three_nodes_read_their_prompt_from_the_session():
-    """三个节点各读 session 上的一个属性（GraphManager 不内嵌提示词）"""
+    """三个节点各读session上的一个属性（GraphManager不内嵌提示词）"""
     agent_session, reply_session, reflection_session = node_prompt_sessions("sys-prompt")
     asyncio.run(make_manager(agent_session).agent_node({"agent_message": [], "query": "q"}))
     asyncio.run(make_manager(reply_session).generate_reply_node({"query": "q"}))

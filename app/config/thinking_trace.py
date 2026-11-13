@@ -1,8 +1,8 @@
-# """
+#"""
 #架构作用：将SSE思考事件累积成版本化结构并在数据库文本列往返编码
 #调用方：流式消费端累积事件，历史读取端解码供前端渲染
 #数据流：事件→ items → JSON；旧文本/损坏形状尽量降级保留
-# """
+#"""
 """
 config/thinking_trace.py思考链的结构化存取
 
@@ -23,7 +23,7 @@ TEXT = "text"
 
 
 def append_event(items, event):
-    """把一条 SSE 事件累积进思考链，返回是否发生了变化。
+    """把一条SSE事件累积进思考链，返回是否发生了变化。
 
     只认识思考类事件（node / tool_call / thinking_delta），
     回答正文、字幕、状态之类的通知一律忽略。
@@ -60,7 +60,7 @@ def from_texts(texts):
 
 
 def encode(items):
-    """编码成入库字符串；没有思考内容时返回 None（列保持 NULL）。"""
+    """编码成入库字符串；没有思考内容时返回None（列保持NULL）。"""
     if not items:
         return None
     return json.dumps({"v": TRACE_VERSION, "items": items}, ensure_ascii=False)
@@ -84,5 +84,5 @@ def decode(raw):
         return [item for item in items if isinstance(item, dict)] if isinstance(items, list) else []
     if isinstance(data, list):
         return [item for item in data if isinstance(item, dict)]
-    # JSON标量（例如误写了一个数字）：当作文本保留，不假装有思考链
+    #JSON标量（例如误写了一个数字）：当作文本保留，不假装有思考链
     return [{"kind": TEXT, "text": data if isinstance(data, str) else json.dumps(data, ensure_ascii=False)}]

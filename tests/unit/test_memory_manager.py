@@ -30,7 +30,7 @@ class FakeDB:
 
 
 def _sql(fake_db, prefix):
-    """取最近一条以 prefix 开头的 SQL，顺带保证这类查询确实发生过。"""
+    """取最近一条以prefix开头的SQL，顺带保证这类查询确实发生过。"""
     matched = [sql for sql, _ in fake_db.calls if sql.startswith(prefix)]
     assert matched, f"没有执行 {prefix} 查询"
     return matched[-1]
@@ -68,7 +68,7 @@ def test_refresh_loads_session_state(monkeypatch):
         {"role": "user", "content": "q2"},
         {"role": "assistant", "content": "a2"},
     ]
-    # 迁移已移到应用启动阶段，refresh 只负责读取状态
+    #迁移由应用启动时执行，refresh只负责读取状态
     assert not any("alter table chat add column thinking" in sql for sql, _ in fake_db.calls)
 
 
@@ -89,7 +89,7 @@ def test_read_history_decodes_thinking_and_tolerates_bad_data(monkeypatch):
     assert history[1]["thinking"] == []
     assert history[2]["thinking"] == [{"kind": "text", "text": "早期纯文本思考"}]
     assert "thinking" in fake_db.calls[0][0]
-    # 老数据没有模型列时也要正常返回 None，不能因为多两列就报错
+    #老数据没有模型列时也要正常返回None，不能因为多两列就报错
     assert history[0]["llm_model"] is None
     assert history[0]["llm_provider"] is None
     assert (history[1]["llm_model"], history[1]["llm_provider"]) == ("gpt-4o-mini", "openai")
@@ -127,8 +127,8 @@ def test_update_short_memory_commits(monkeypatch):
     assert "thinking" in sql
     assert "llm_model" in sql
     assert "llm_provider" in sql
-    assert params[4] is None      # 没有思考内容时写 NULL
-    assert params[5] is None      # 拿不到模型名时写 NULL，不能报错
+    assert params[4] is None      #没有思考内容时写NULL
+    assert params[5] is None      #拿不到模型名时写NULL，不能报错
     assert params[6] is None
 
 
@@ -148,7 +148,7 @@ def test_update_short_memory_stores_structured_trace(monkeypatch):
 
 
 def test_update_short_memory_writes_llm_model_and_provider(monkeypatch):
-    """R12：每轮把实际使用的厂商/模型写进 chat 表，历史回放才能解释风格差异"""
+    """每轮把实际使用的厂商/模型写进chat表，历史回放才能解释风格差异"""
     fake_db = FakeDB()
     monkeypatch.setattr(memory_module, "db", fake_db)
 

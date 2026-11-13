@@ -1,9 +1,9 @@
-"""工具唯一注册表（P6a）：注册表 = 模型可见载荷 = 执行侧工具，三者必须由同一处派生。
+"""工具唯一注册表：注册表=模型可见载荷=执行侧工具，三者必须由同一处派生。
 
-app/tools/registry.py 是唯一事实来源，本文件锁住它的对外形状：
-1) 工具名与顺序（test_func_call_manager.py 按位置解包、ToolNode 按名派发）
-2) OpenAI 载荷（config.TOOLS_SCHEMAS：发给模型 + 工具调用白名单）与注册表逐字段一致
-3) 执行侧 LangChain 工具的名字/描述来自注册表；对外（MCP）作用域只含无状态工具
+app/tools/registry.py是唯一事实来源，本文件锁住它的对外形状：
+1)工具名与顺序（test_func_call_manager.py按位置解包、ToolNode按名派发）
+2) OpenAI载荷（config.TOOLS_SCHEMAS：发给模型+工具调用白名单）与注册表逐字段一致
+3)执行侧LangChain工具的名字/描述来自注册表；对外（MCP）作用域只含无状态工具
 """
 import subprocess
 import sys
@@ -16,7 +16,7 @@ from app.tools import registry
 from app.tools.adapters import langgraph as langgraph_adapter
 from app.tools.adapters import openai as openai_adapter
 
-# 顺序即契约：与 test_func_call_manager.py 的位置解包顺序一致，改这里必须同步改那边
+#顺序即契约：与test_func_call_manager.py的位置解包顺序一致，改这里必须同步改那边
 EXPECTED_TOOL_ORDER = [
     "output_time",
     "retrieve_knowledge",
@@ -25,14 +25,14 @@ EXPECTED_TOOL_ORDER = [
     "save_memory",
     "search_web",
     "change_status",
-    # 阶段2接线（F6拍板）：agent_framework四个只读工具追加在末尾
+    #agent_framework四个只读工具追加在末尾
     "read_file",
     "list_dir",
     "glob",
     "grep",
 ]
 
-# 方案 R5：MCP 侧只暴露无状态工具
+#MCP侧只暴露无状态工具
 EXPECTED_EXTERNAL = [
     "output_time",
     "retrieve_knowledge",
@@ -60,7 +60,7 @@ def test_registry_names_are_unique_and_resolvable():
 
 
 def test_config_payload_is_generated_from_registry():
-    """config.TOOLS_SCHEMAS 不再是第二份定义，而是注册表的 OpenAI 出口"""
+    """config.TOOLS_SCHEMAS不是第二份定义，而是注册表的OpenAI出口"""
     assert config.TOOLS_SCHEMAS == openai_adapter.to_openai_schemas()
 
 
@@ -94,7 +94,7 @@ def test_external_scope_only_exposes_stateless_tools():
 
 
 def test_langgraph_adapter_binds_registry_name_and_description(monkeypatch):
-    """执行侧工具的名字/描述必须来自注册表，不允许各实现再写一份 docstring"""
+    """执行侧工具的名字/描述必须来自注册表，不允许各实现再写一份docstring"""
     seen = []
     fake_tools_module = types.ModuleType("langchain_core.tools")
 
@@ -113,7 +113,7 @@ def test_langgraph_adapter_binds_registry_name_and_description(monkeypatch):
 
 
 def test_built_tools_expose_registry_names():
-    """真实 langchain 装饰器与测试替身下都要拿到同一批名字（替身回退到函数名）"""
+    """真实langchain装饰器与测试替身下都要拿到同一批名字（替身回退到函数名）"""
     tools = langgraph_adapter.build_tools(object())
     assert [getattr(t, "name", None) or t.__name__ for t in tools] == registry.tool_names()
     assert [getattr(t, "description", None) or t.__doc__ for t in tools] == [
@@ -122,11 +122,11 @@ def test_built_tools_expose_registry_names():
 
 
 def test_registry_and_adapters_do_not_pull_mcp():
-    """唯一注册表与它的两个适配器都不依赖 MCP（P6a 的边界）。
+    """唯一注册表与它的两个适配器都不依赖MCP。
 
-    必须用**子进程**验证，不能在同进程里断言"全局 sys.modules 没有 mcp"：
-    app/main.py 在挂载 MCP 服务时会合法地导入 mcp，于是那种断言会随测试执行顺序
-    时红时绿（本仓库把 tests/unit 排在某些会导入 app 的用例后面就会翻车）。
+    必须用**子进程**验证，不能在同进程里断言"全局sys.modules没有mcp"：
+    app/main.py在挂载MCP服务时会合法地导入mcp，于是那种断言会随测试执行顺序
+    时红时绿（本仓库把tests/unit排在某些会导入app的用例后面就会翻车）。
     子进程从干净解释器出发，只导入注册表与两个适配器，真正验证边界。
     """
     code = (
@@ -136,8 +136,8 @@ def test_registry_and_adapters_do_not_pull_mcp():
         "print(','.join(bad))\n"
         "raise SystemExit(1 if bad else 0)\n"
     )
-    # 输出重定向到临时文件而不是 PIPE：受限沙箱可能禁止 CreatePipe，
-    # 而本测试只关心子进程退出码与 stdout 文本。
+    #输出重定向到临时文件而不是PIPE：受限沙箱可能禁止CreatePipe，
+    #而本测试只关心子进程退出码与stdout文本。
     with tempfile.TemporaryDirectory() as tmp_dir:
         out_path = Path(tmp_dir) / "stdout.txt"
         err_path = Path(tmp_dir) / "stderr.txt"

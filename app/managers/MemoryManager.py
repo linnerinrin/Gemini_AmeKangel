@@ -12,7 +12,7 @@ from collections import deque
 from pathlib import Path
 from app.agent_framework.context_budget.counter import TiktokenCounter
 from app.agent_framework.context_budget.window import TurnWindowPolicy
-from app.config.status_rules import plan_status_change
+from app.config.status_rules import plan_followers_gain, plan_status_change
 from app.config.config import config
 from app.config.thinking_trace import decode as decode_thinking, encode as encode_thinking
 from app.interfaces import IMemory
@@ -114,7 +114,7 @@ class MemoryManager(IMemory):
     #多列依次写入后一次commit，再加载状态及提示词；不在本层提供失败回滚
     #"""
     def update_status(self, followers=None, affection=None, stress=None, mental=None):
-        """按增量更新状态栏；followers当前只读，不接入随机状态变化。"""
+        """按增量更新状态栏；followers只增不减、无上限，其余三项钳制到0..100。"""
         updates = (
             ("followers", followers, False),
             ("affection", affection, True),
@@ -134,6 +134,13 @@ class MemoryManager(IMemory):
         if deltas:
             self.update_status(**deltas)
         return deltas
+
+    def apply_followers_gain(self, rng=None):
+        """直播模式每轮结算一次粉丝增长；返回实际增量，未命中为0。"""
+        gain = plan_followers_gain(rng=rng)
+        if gain:
+            self.update_status(followers=gain)
+        return gain
 
     def load_status(self):
         db("select followers,affection,stress,mental from session where id=%s;", (self.session_id,))

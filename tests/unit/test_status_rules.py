@@ -40,3 +40,21 @@ def test_status_change_rejects_invalid_input_before_changes():
         status_module.plan_status_change({"affection": True})
     with pytest.raises(status_module.StatusArgumentError):
         status_module.plan_status_change({"affection": 1}, probability=2)
+
+
+def test_followers_gain_hit_returns_step_in_range():
+    gain = status_module.plan_followers_gain(
+        probability=1.0, min_step=3, max_step=3, rng=random.Random(1))
+    assert gain == 3
+
+
+def test_followers_gain_probability_zero_returns_zero():
+    assert status_module.plan_followers_gain(
+        probability=0, min_step=1, max_step=5, rng=random.Random(0)) == 0
+
+
+def test_followers_gain_rejects_invalid_probability():
+    import pytest
+
+    with pytest.raises(status_module.StatusArgumentError):
+        status_module.plan_followers_gain(probability=2)

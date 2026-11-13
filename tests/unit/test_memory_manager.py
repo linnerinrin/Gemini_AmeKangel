@@ -132,6 +132,39 @@ def test_update_short_memory_commits(monkeypatch):
     assert params[6] is None
 
 
+def test_apply_followers_gain_writes_unbounded_increment(monkeypatch):
+    """命中概率时粉丝数裸加法增长（无上限），随后回读状态"""
+    import random
+
+    fake_db = FakeDB()
+    fake_db.fetchone_queue = [(120, 50, 0, 0)]
+    monkeypatch.setattr(memory_module, "db", fake_db)
+
+    mgr = memory_module.MemoryManager()
+    mgr.session_id = "session-1"
+    gain = mgr.apply_followers_gain(rng=random.Random(1))
+
+    assert gain > 0
+    sql, params = fake_db.calls[0]
+    assert sql.startswith("update session set followers=followers+%s")
+    assert params == (gain, "session-1")
+    assert fake_db.committed
+    assert mgr.fol == 120
+
+
+def test_apply_followers_gain_miss_writes_nothing(monkeypatch):
+    """未命中概率时不产生任何数据库写入"""
+    fake_db = FakeDB()
+    monkeypatch.setattr(memory_module, "db", fake_db)
+    monkeypatch.setattr(memory_module, "plan_followers_gain", lambda *, rng=None: 0)
+
+    mgr = memory_module.MemoryManager()
+    mgr.session_id = "session-1"
+
+    assert mgr.apply_followers_gain() == 0
+    assert not fake_db.calls
+
+
 def test_update_short_memory_stores_structured_trace(monkeypatch):
     fake_db = FakeDB()
     monkeypatch.setattr(memory_module, "db", fake_db)

@@ -179,6 +179,24 @@ def test_single_chat_updates_memory_and_history(monkeypatch):
     assert session.rag_mgr.context
 
 
+def test_followers_gain_settles_only_in_live_mode(monkeypatch):
+    """私聊档（mode=0）不结算涨粉，切到直播档后每轮生成成功结算一次"""
+    session = make_session(monkeypatch)
+    calls = []
+    monkeypatch.setattr(
+        session.memory_mgr, "apply_followers_gain",
+        lambda rng=None: calls.append(1) or 5,
+        raising=False,
+    )
+
+    asyncio.run(session.single_chat("hello"))
+    assert calls == []
+
+    session.load_mode("2")
+    asyncio.run(session.single_chat("hello"))
+    assert calls == [1]
+
+
 def test_single_chat_passes_actual_model_meta_to_memory(monkeypatch):
     """每轮落库要带上ModelManager实际解析出的厂商/模型，而不是配置里的静态值"""
     session = make_session(monkeypatch)

@@ -56,3 +56,18 @@ def plan_status_change(amounts, *, probability=None, min_step=None, max_step=Non
         if magnitude:
             deltas[name] = magnitude if direction > 0 else -magnitude
     return deltas
+
+
+def plan_followers_gain(*, probability=None, min_step=None, max_step=None, rng=None):
+    """按概率抽取粉丝增量；未命中返回0。粉丝只增不减、无上限。"""
+    probability = config.FOLLOWERS_GROW_PROBABILITY if probability is None else probability
+    low, high = _bounds(
+        config.FOLLOWERS_GROW_MIN_STEP if min_step is None else min_step,
+        config.FOLLOWERS_GROW_MAX_STEP if max_step is None else max_step,
+    )
+    if not 0 <= probability <= 1:
+        raise StatusArgumentError("粉丝增长概率必须在 0 到 1 之间")
+    source = rng if rng is not None else random
+    if source.random() >= probability:
+        return 0
+    return source.randint(low, high)

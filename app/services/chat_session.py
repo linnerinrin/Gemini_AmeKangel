@@ -192,6 +192,7 @@ class ChatSession:
         provider, model = self.last_model_meta()
         self.update_memory(prompt, reply, from_texts(think_text if isinstance(think_text, list) else [think]),
                            model=model, provider=provider)
+        self._settle_followers()
         return reply, think
 
     #"""
@@ -226,9 +227,21 @@ class ChatSession:
         think = "\n".join(think_text) if isinstance(think_text, list) else str(think_text)
         provider, model = self.last_model_meta()
         self.update_memory(prompt, reply, trace_items, model=model, provider=provider)
+        self._settle_followers()
         if on_event:
             await on_event({"type": "done", "answer": reply, "think": think})
         return reply, think
+
+    #"""
+    #直播档（mode非0）每轮生成成功后按概率涨粉；私聊档不增长
+    #替身（FakeMemory）没有apply_followers_gain时跳过，保证测试契约不变
+    #"""
+    def _settle_followers(self):
+        if self.current_mode == "0":
+            return
+        settle = getattr(self.memory_mgr, "apply_followers_gain", None)
+        if callable(settle):
+            settle()
 
     #"""
     #预留推文接口，目前省略号不执行生成或持久化，await后隐式返回None

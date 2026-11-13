@@ -86,6 +86,10 @@ class Config(BaseSettings):
     STATUS_CHANGE_PROBABILITY: float = 1.0
     STATUS_CHANGE_MIN_STEP: int = 0
     STATUS_CHANGE_MAX_STEP: int = 5
+    #粉丝增长：直播模式每轮生成成功后按概率增加，私聊不增长
+    FOLLOWERS_GROW_PROBABILITY: float = 0.5
+    FOLLOWERS_GROW_MIN_STEP: int = 1
+    FOLLOWERS_GROW_MAX_STEP: int = 30
     SEARCH_MAX_RESULTS: int = 5
     REWRITE_MAX_TOKENS: int = 64
     TOOLS_SCHEMAS: list = []

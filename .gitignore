@@ -34,3 +34,8 @@ tmp1lzwt97u/
 # 只忽略仓库根目录的运行时数据目录；static/js/data 是前端数据层，必须入库
 /data/
 /data-gym-cache/
+
+# pytest 跑测试时在仓库根生成的临时工作目录（含 tmp_path 夹具文件与 llm_settings.json 副本）
+pytest-of-*/
+# 本地临时目录（部分环境 Python tempfile 不可用时的兜底）
+.tmpdir/

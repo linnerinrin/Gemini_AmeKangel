@@ -1,5 +1,5 @@
 #"""
-#架构作用：agent_framework只读工具子包的包边界；当前不接入运行路径，调用方按需导入子模块
+#架构作用：agent_framework只读工具子包的包边界；调用方按需导入子模块
 #本文件仅说明职责与依赖方向，无独立执行数据流
 #"""
 """
@@ -10,7 +10,9 @@ agent_framework/readonly子包：只读文件工具（read_file / list_dir / glo
 - tool_specs.py工具规格适配：把四个只读工具包装为app/tools/registry.py的ToolSpec形状
 
 依赖方向：本包只依赖contracts.py的端口与数据类，不反向依赖原项目任何模块
-（tool_specs.py对app.tools.registry的导入在函数内延迟进行，接入时才生效）
-当前状态：纯新增文件，未被app/现有任何模块import，不改变现有行为
+（tool_specs.py对app.tools.registry的导入在函数内延迟进行）
+接入状态（2026-11）：已接入。app/tools/registry.py:274调用build_readonly_tool_specs把四个
+只读工具追加进TOOL_REGISTRY末尾（scope=SCOPE_INTERNAL，不经MCP暴露）；
+app/managers/FuncCallManager.py:20-21挂载ReadOnlyFileTools实例到mgr.readonly_tools
 本文件不导出任何类：调用方显式import子模块，保持边界清晰
 """

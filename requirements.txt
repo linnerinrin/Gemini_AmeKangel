@@ -1,19 +1,9 @@
 openai~=1.68.0
-unsloth~=2026.4.4
-torch~=2.10.0
-datasets~=4.3.0
-trl~=0.24.0
-transformers~=5.5.0
-numpy~=2.4.4
-packaging~=26.1
 fastapi>=0.110.0
 uvicorn[standard]>=0.29.0
 # 设置页探测端点与 model_adapter 的 HTTP 传输直接使用（此前靠 openai 传递安装，不应依赖巧合）
 httpx>=0.27.0
 pydantic-settings>=2.2.0
-python-jose[cryptography]>=3.3.0
-passlib[bcrypt]>=1.7.4
-bcrypt>=4.0.0
 pymysql>=1.1.0
 pyyaml>=6.0
 langgraph>=0.2.0
@@ -26,3 +16,13 @@ ddgs>=0.6.0
 mcp>=2.3.0
 # 阶段3接线（F1拍板）：token精确计数；缺失时TiktokenCounter回退字符估算
 tiktoken>=0.9.0
+
+# ── 以下为间接依赖的显式钉版本，app/ 内无直接 import，勿删 ──
+# transformers：RAGManager 经 langchain-huggingface 用 HuggingFaceEmbeddings/CrossEncoder
+transformers>=4.40,<6
+# torch：sentence-transformers 的运行时后端（.env 中 RAG_DEVICE=cpu 时也需要）
+# 注意：此项无法复现 CUDA 构建，需 GPU 加速时按 https://pytorch.org 单独安装 cuXXX 轮子
+torch~=2.10.0
+# numpy / packaging：langchain 栈的传递依赖，显式钉版本防上游冲突
+numpy~=2.4.4
+packaging~=26.1

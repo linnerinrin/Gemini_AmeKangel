@@ -4,7 +4,7 @@
 #本文件仅说明职责与依赖方向，无独立执行数据流
 #"""
 """
-agent_framework/model_adapter子包：模型调用适配（纯新增，未接入运行路径）
+agent_framework/model_adapter子包：模型调用适配（半接入：仅非流式路径）
 
 - client.py   OpenAI兼容聊天客户端：OpenAICompatibleChatClient
               （ChatClientPort默认实现，非流式chat/completions）
@@ -17,4 +17,8 @@ agent_framework/model_adapter子包：模型调用适配（纯新增，未接入
 
 依赖方向：各模块只依赖contracts（以及标准库/已装传输库），不导出具体类到包级命名空间，
 调用方按需导入，避免包级import带来重依赖；本包不反向依赖任何实现
+接入状态（2026-11）：半接入。app/managers/ModelManager.py:19直接import本包，
+:187在_generate_via_port内实例化OpenAICompatibleChatClient；
+但:163-164的条件（not use_tools and resolved and not injected）决定了只有
+「非流式 + 未注入替身」才走本端口，主链路与全部流式调用仍走openai SDK的AsyncOpenAI
 """

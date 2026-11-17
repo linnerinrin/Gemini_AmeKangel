@@ -72,8 +72,7 @@ class Config(BaseSettings):
         "3": "prompts/ame_knowledge.txt",
     }
 
-    #记忆相关
-    MEMORY_FILE_PATH:str=str(PROJECT_ROOT/"data"/"user_memories.json")
+    #记忆相关（记忆落MySQL，见MemoryManager + repository/conn.py）
     MYSQL_USER:str
     MYSQL_PASSWORD:str
     MYSQL_DATABASE:str="gemini"

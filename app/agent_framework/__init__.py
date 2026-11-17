@@ -1,5 +1,5 @@
 #"""
-#架构作用：新增agent框架的包边界；当前不接入运行路径，调用方按需导入子模块
+#架构作用：agent框架的包边界；调用方按需导入子模块
 #本文件仅说明职责与依赖方向，无独立执行数据流
 #"""
 """
@@ -16,5 +16,7 @@ agent_framework包：框架层，调用方按需导入子模块
 
 依赖方向：各模块只依赖contracts.py，模块之间不得互相import；
 对接原项目时由适配器依赖本包抽象，本包不反向依赖运行路径
-当前状态：纯新增文件，未被app/现有任何模块import，不改变现有行为
+接入状态（2026-11）：security / readonly / context_budget / mcp_client四个子包均已接入运行路径，
+分别由app/api/chat/{chat_routes,settings_routes}.py、app/managers/{FuncCallManager,MemoryManager}.py、
+app/tools/registry.py消费；仅model_adapter为半接入（见该子包__init__.py）
 """

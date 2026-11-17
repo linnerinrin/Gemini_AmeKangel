@@ -1,6 +1,7 @@
 #"""
 #架构作用：模型调用适配模块，ChatClientPort的默认实现（OpenAI兼容端点）
-#调用方：未来适配器注入运行路径；当前为纯新增模块，未被app/任何模块import
+#调用方：app/managers/ModelManager.py:19（import）、:187（_generate_via_port内实例化）；
+#        :163-164的条件使其只覆盖「非流式 + 未注入替身」的路径，流式与主链路仍走openai SDK
 #数据流：messages + ModelProfile → POST {base_url}/chat/completions → ChatReply
 #"""
 """

@@ -1,10 +1,10 @@
 #"""
-#架构作用：mcp_client子包的包边界；MCP客户端骨架模块的集合入口说明
+#架构作用：mcp_client子包的包边界；MCP客户端模块的集合入口说明
 #调用方：调用方按需导入具体模块（from .client import NotConfiguredMcpClient等）
 #本文件仅说明职责与依赖方向，无独立执行数据流
 #"""
 """
-agent_framework/mcp_client子包：MCP客户端骨架（纯新增，未接入运行路径）
+agent_framework/mcp_client子包：MCP客户端（已接入运行路径）
 
 - client.py        MCP客户端实现：NotConfiguredMcpClient（占位默认实现，端口先行）
 与FakeMcpClient（测试用内存实现）
@@ -14,4 +14,7 @@ agent_framework/mcp_client子包：MCP客户端骨架（纯新增，未接入运
 依赖方向：各模块只依赖contracts（McpClientPort / McpToolDescriptor / McpClientError）
 以及标准库；不导出具体类到包级命名空间，调用方按需导入，避免包级import带来重依赖；
 本包不反向依赖任何实现，除tool_bridge.py函数内延迟导入registry外不import原项目
+接入状态（2026-11）：app/tools/registry.py:309-311调用build_mcp_tool_specs，
+把MCP外部工具（output_time / retrieve_knowledge / retrieve_context / rewrite / search_web）
+合并进注册表，scope=SCOPE_EXTERNAL，由app/mcp_server/server.py对外暴露
 """

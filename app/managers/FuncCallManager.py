@@ -6,7 +6,6 @@
 """
 managers/FuncCallManager.py
 工具仓库管理器，为主agent提供tools
-abstract on IFuncCall
 base on RAGManager/MemoryManager/ModelManager
 
 工具的名称/描述/参数schema/实现统一存放在app/tools/registry.py（唯一事实来源）；
@@ -19,7 +18,6 @@ from pathlib import Path
 
 from app.agent_framework.readonly.fs_read_tools import ReadOnlyFileTools
 from app.agent_framework.readonly.path_guard import PathGuard
-from app.interfaces.IFuncCall import IFuncCall
 from app.tools.adapters.langgraph import build_tools
 
 #只读工具允许读取的根目录：默认放宽到用户目录（桌面/文档等可直接读），
@@ -37,7 +35,7 @@ def _readonly_roots() -> list[str]:
     return parts or [str(_DEFAULT_READONLY_ROOT)]
 
 
-class FunctionCallManager(IFuncCall):
+class FunctionCallManager:
     #"""
     #构造时尚未绑定依赖；空工具表避免在服务组装完成前创建带错误引用的闭包
     #readonly_tools：挂到本管理器属性上，注册表末尾四个只读工具的impl闭包经

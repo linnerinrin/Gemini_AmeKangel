@@ -5,7 +5,6 @@
 #"""
 """
 managers/RAGManager.py检索增强生成管理器
-Abstract on IRAG
 """
 
 import asyncio
@@ -15,10 +14,9 @@ from sentence_transformers.cross_encoder import CrossEncoder
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_core.documents import Document
 from app.config.config import config
-from app.interfaces import IRAG
 
 
-class RAGManager(IRAG):
+class RAGManager:
     #"""
     #同步加载embedding与cross-encoder；前者向量化，后者对候选逐对打分
     #"""

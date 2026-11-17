@@ -5,18 +5,16 @@
 #"""
 """
 managers/AccountManager单会话管理器用于提供目标session_id
-Abstract on IAccount
 
 """
 
 import secrets
 
 from app.config.config import config
-from app.interfaces.IAccount import IAccount
 from repository.conn import db
 
 
-class AccountManager(IAccount):
+class AccountManager:
     #"""
     #生成十八位随机候选ID，再查库避开已存在ID；碰撞时递增重试
     #返回整数，公开接口再转字符串，避免前端JavaScript大整数精度损失

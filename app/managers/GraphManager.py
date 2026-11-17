@@ -5,7 +5,6 @@
 #"""
 """
 managers/GraphManager.py  LangGraph图管理器
-Abstract on IGraph
 """
 import operator
 from typing import Annotated, List, TypedDict
@@ -16,7 +15,6 @@ from langgraph.graph import StateGraph
 from langgraph.prebuilt import ToolNode
 
 from app.config.config import config
-from app.interfaces.IGraph import IGraph
 
 MAX_TOOL_TURNS = config.MAX_TOOL_TURNS
 MAX_REFLECTION_TURNS = config.MAX_REFLECTION_TURNS
@@ -48,7 +46,7 @@ class AgentState(TypedDict):
     stream_event: object    #可选的异步流式事件回调
 
 
-class GraphManager(IGraph):
+class GraphManager:
     def __init__(self):
         super().__init__()
         self.app = None

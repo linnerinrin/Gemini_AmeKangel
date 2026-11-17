@@ -5,7 +5,6 @@
 #"""
 """
 managers/MemoryManager.py记忆模块管理器
-Abstract on IMemory
 """
 import json
 from collections import deque
@@ -15,7 +14,6 @@ from app.agent_framework.context_budget.window import TurnWindowPolicy
 from app.config.status_rules import plan_followers_gain, plan_status_change
 from app.config.config import config
 from app.config.thinking_trace import decode as decode_thinking, encode as encode_thinking
-from app.interfaces import IMemory
 from repository.conn import db
 
 #轮/消息口径统一策略（一轮=user+assistant两条）与token计数器
@@ -41,7 +39,7 @@ STATUS_DEFAULTS = {
 #状态变化update status
 #加载聊天页面chat where sessionid=""  order by created_at
 
-class MemoryManager(IMemory):
+class MemoryManager:
     def __init__(self):
         super().__init__()
         self.session_id=None

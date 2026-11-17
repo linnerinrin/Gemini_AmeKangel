@@ -5,7 +5,6 @@
 #"""
 """
 manager/ModelManager推理模块管理器
-Abstract on IModel
 OpenAI兼容客户端按当前生效设置惰性构造并缓存；改设置后下一个请求即生效，无需重启
 非流式/聚合路径（use_tools=False且为真实配置）收敛到ChatClientPort
 （agent_framework OpenAICompatibleChatClient，错误归一为ModelClientError）；
@@ -14,7 +13,6 @@ OpenAI兼容客户端按当前生效设置惰性构造并缓存；改设置后�
 import asyncio
 import json
 import re
-from app.interfaces.IModel import IModel
 from app.config.config import config
 from app.config.llm_import import load_llm_settings
 from app.agent_framework.contracts import ModelProfile
@@ -69,7 +67,7 @@ class GenerationResult:
         return self.content
 
 
-class ModelManager(IModel):
+class ModelManager:
     """OpenAI兼容模型管理器。
 
     关键点：客户端不在__init__里构造，而是每个请求读一次当前设置再惰性构造，

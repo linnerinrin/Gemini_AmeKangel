@@ -14,8 +14,7 @@ tools/registry.py工具唯一注册表（唯一事实来源）
       ├─ app/tools/adapters/langgraph.py → LangChain工具对象（FuncCallManager._create_tools → ToolNode）
       └─ app/mcp_server/server.py               → MCP Server的tools列表（只暴露无状态工具）
 
-原app/config/tools_schemas.yaml的内容已原样迁移到本文件并删除该文件：留着那份yaml只会
-成为漂移陷阱（改了它不会被加载，也不会有任何提示）。需要人类可读快照时随时重新生成：
+需要人类可读快照时随时可以重新生成：
 
     python -m app.tools.adapters.openai
 
@@ -67,7 +66,7 @@ class ToolSpec:
 
 
 def _query_parameters(description: str) -> Dict[str, Any]:
-    """只有一个必填query参数的JSON Schema（与迁移前的yaml完全一致）。"""
+    """只有一个必填query参数的JSON Schema。"""
     return {
         "type": "object",
         "properties": {"query": {"type": "string", "description": description}},

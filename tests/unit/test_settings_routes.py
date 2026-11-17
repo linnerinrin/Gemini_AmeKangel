@@ -130,7 +130,7 @@ def test_trailing_slash_and_case_do_not_require_new_key(client, settings_env):
 
 
 #═══════════════════════════════════════
-#3.保存路径的出站校验
+#3.保存路径的地址校验（由llm_settings._assert_public_host承担）
 #═══════════════════════════════════════
 
 def test_saving_private_base_url_is_blocked(client, settings_env):
@@ -139,8 +139,8 @@ def test_saving_private_base_url_is_blocked(client, settings_env):
         {"custom": {"base_url": "http://127.0.0.1:11434/v1", "model": "local", "api_key": NEW_KEY}},
     )
 
-    assert response.status_code == 400
-    assert "不允许外发" in response.json()["detail"]
+    assert response.status_code == 422
+    assert "不允许指向环回" in response.json()["detail"]
     assert settings_env.load_settings().profiles == {}
 
 

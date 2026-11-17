@@ -1,9 +1,8 @@
-"""建表与迁移：thinking/llm_model/llm_provider列的幂等补充，失败不能挡住启动"""
+"""建库建表：chat表必须一次建全thinking/llm_model/llm_provider三列"""
 import pymysql
 import pytest
 
 from conftest import load_source_module
-from app.config import schema as schema_module
 
 
 init_db_module = load_source_module("init_db_under_test", "repository/init_db.py")
@@ -31,95 +30,7 @@ class FakeDB:
         return []
 
 
-def test_migrate_adds_column_and_commits(monkeypatch):
-    schema_module.reset_state_for_tests()
-    fake_db = FakeDB()
-    monkeypatch.setattr(init_db_module, "db", fake_db)
-
-    assert init_db_module.migrate() is True
-    assert any("alter table chat add column thinking" in sql for sql in fake_db.calls)
-    assert fake_db.committed
-    assert schema_module._ready is True
-
-
-def test_migrate_treats_duplicate_column_as_ready(monkeypatch):
-    """并发启动或已有列时，1060等价于迁移成功。"""
-    schema_module.reset_state_for_tests()
-    fake_db = FakeDB(error=pymysql.err.OperationalError(1060, "Duplicate column name 'thinking'"))
-    monkeypatch.setattr(init_db_module, "db", fake_db)
-
-    assert init_db_module.migrate() is True
-    assert schema_module._ready is True
-    assert schema_module._llm_model_ready is True
-    assert schema_module._llm_provider_ready is True
-
-
-def test_migrate_adds_llm_model_and_provider_columns(monkeypatch):
-    """chat表要补llm_model / llm_provider两列（老库靠幂等ALTER）"""
-    schema_module.reset_state_for_tests()
-    fake_db = FakeDB()
-    monkeypatch.setattr(init_db_module, "db", fake_db)
-
-    assert init_db_module.migrate() is True
-    assert any("alter table chat add column llm_model varchar(64)" in sql for sql in fake_db.calls)
-    assert any("alter table chat add column llm_provider varchar(32)" in sql for sql in fake_db.calls)
-    assert schema_module._llm_model_ready is True
-    assert schema_module._llm_provider_ready is True
-
-
-def test_llm_column_migration_is_idempotent(monkeypatch):
-    """重复列（1060）视为迁移成功；失败不能被缓存成ready。"""
-    schema_module.reset_state_for_tests()
-    duplicate_db = FakeDB(error=pymysql.err.OperationalError(1060, "Duplicate column name 'llm_model'"))
-    monkeypatch.setattr(init_db_module, "db", duplicate_db)
-    assert init_db_module.migrate() is True
-    assert schema_module._llm_model_ready is True
-    assert schema_module._llm_provider_ready is True
-
-    schema_module.reset_state_for_tests()
-
-    class LlmFailDB(FakeDB):
-        def __call__(self, sql, params=None):
-            self.calls.append(sql)
-            if "llm_model" in sql or "llm_provider" in sql:
-                raise pymysql.err.OperationalError(1045, "Access denied")
-            return 1
-
-    monkeypatch.setattr(init_db_module, "db", LlmFailDB())
-    assert init_db_module.migrate() is False
-    assert schema_module._llm_model_ready is False
-    assert schema_module._llm_provider_ready is False
-    assert schema_module._ready is True       #前面的列已就绪，不受影响
-
-
-def test_migration_failure_leaves_state_retryable(monkeypatch, capsys):
-    """失败不能被缓存为ready，后续调用必须重试。"""
-    schema_module.reset_state_for_tests()
-    failed_db = FakeDB(error=pymysql.err.OperationalError(1045, "Access denied"))
-    good_db = FakeDB()
-
-    assert init_db_module.migrate(failed_db) is False
-    assert schema_module._ready is False
-    assert init_db_module.migrate(good_db) is True
-    assert schema_module._ready is True
-    assert any("alter table chat add column thinking" in sql for sql in good_db.calls)
-    out = capsys.readouterr().out
-    assert "thinking 列迁移跳过" in out
-
-
-def test_startup_migration_failure_fails_fast(monkeypatch):
-    """应用启动不能继续到接收请求，却在INSERT时才因缺列失败。"""
-    schema_module.reset_state_for_tests()
-    fake_db = FakeDB(error=pymysql.err.OperationalError(1045, "Access denied"))
-    monkeypatch.setattr(init_db_module, "db", fake_db)
-
-    with pytest.raises(RuntimeError, match="chat.thinking"):
-        init_db_module.migrate(raise_on_error=True)
-    assert schema_module._ready is False
-
-
 def test_init_creates_table_with_thinking_column(monkeypatch):
-    schema_module.reset_state_for_tests()
     fake_db = FakeDB()
     monkeypatch.setattr(init_db_module, "db", fake_db)
 
@@ -127,12 +38,10 @@ def test_init_creates_table_with_thinking_column(monkeypatch):
 
     create = [sql for sql in fake_db.calls if "create table if not exists chat" in sql]
     assert create and "thinking mediumtext" in create[0]
-    assert schema_module._ready is True
 
 
 def test_init_creates_table_with_llm_columns(monkeypatch):
     """新库建表就带llm_model / llm_provider，且紧跟在场景轴mode之后。"""
-    schema_module.reset_state_for_tests()
     fake_db = FakeDB()
     monkeypatch.setattr(init_db_module, "db", fake_db)
 
@@ -143,12 +52,31 @@ def test_init_creates_table_with_llm_columns(monkeypatch):
     assert "llm_provider varchar(32) null" in create[0]
     body = create[0].split("mode varchar(20) default '0',")[1]
     assert body.lstrip().startswith("llm_model")
-    assert schema_module._llm_model_ready is True
-    assert schema_module._llm_provider_ready is True
+
+
+def test_init_creates_session_table(monkeypatch):
+    fake_db = FakeDB()
+    monkeypatch.setattr(init_db_module, "db", fake_db)
+
+    init_db_module.init()
+
+    create = [sql for sql in fake_db.calls if "create table if not exists session" in sql]
+    assert create and "unique key uq_session_num(session_num)" in create[0]
+
+
+def test_init_does_not_run_migrations(monkeypatch):
+    """启动路径只建库建表，不执行任何ALTER。"""
+    fake_db = FakeDB()
+    monkeypatch.setattr(init_db_module, "db", fake_db)
+
+    init_db_module.init()
+
+    alters = [sql for sql in fake_db.calls if sql.lstrip().upper().startswith("ALTER")]
+    assert alters == []
 
 
 def test_importing_init_db_has_no_side_effects(monkeypatch):
-    """import不能顺手连库：以前模块级直接init()，测试一导入就会去连MySQL"""
+    """import不能顺手连库"""
     fake_db = FakeDB()
     monkeypatch.setattr(init_db_module, "db", fake_db)
     fake_db.calls.clear()

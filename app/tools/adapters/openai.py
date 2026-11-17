@@ -6,7 +6,7 @@
 tools/adapters/openai.py注册表→模型可见的OpenAI function载荷
 
 唯一事实来源是app/tools/registry.py；本文件只做形状转换，不新增任何工具描述
-config.TOOLS_SCHEMAS由to_openai_schemas()生成（替代旧的app/config/tools_schemas.yaml）：
+config.TOOLS_SCHEMAS由to_openai_schemas()生成：
 ModelManager把它原样放进OpenAI请求的tools=，同时它也是工具调用白名单来源
 
 需要人类可读快照（那份yaml的等价物）时随时可以重新生成：

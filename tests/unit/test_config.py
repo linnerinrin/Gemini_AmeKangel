@@ -79,9 +79,8 @@ def test_tools_schemas_loaded_as_list():
 def test_all_prompts_share_the_same_output_discipline():
     """四个mode的输出规范/表情口径必须一致（debug 14、16）
 
-    公共正文边界已拆到prompts/base.txt，表情与分段口径拆到prompts/task/chat.txt，
-    所以这里断言的是装配后的聊天模式提示词：base + role + task/chat。
-    四角色仍共用同一份正文边界，断言意图不变。
+    公共正文边界与表情/分段/换行口径都在prompts/base.txt，
+    所以这里断言的是装配后的聊天模式提示词：base + role。
     """
     for mode in ("0", "1", "2", "3"):
         prompt = config.sys_prompt_for(mode)
@@ -103,10 +102,10 @@ def test_prompts_assemble_for_every_mode():
     for mode in ("0", "1", "2", "3"):
         prompt = config.sys_prompt_for(mode)
         assert prompt.strip(), f"mode {mode} 装配结果为空"
-        #顺序固定base -> role -> task
+        #顺序固定base -> role
         assert prompt.startswith(config.BASE_PROMPT), f"mode {mode} 未以 base 开头"
         assert prompt == config.join_prompt(
-            config.BASE_PROMPT, config.ROLE_PROMPT[mode], config.TASK_PROMPT)
+            config.BASE_PROMPT, config.ROLE_PROMPT[mode])
         #带 @@@ 分段协议
         assert "@@@" in prompt
 

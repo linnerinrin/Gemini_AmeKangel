@@ -1,25 +1,19 @@
-#"""
-#架构作用：会话映射注册表模块，SessionRegistryPort的实现
-#调用方：适配器按session_id取会话实例与每会话生成锁
-#数据流：session_id →全局锁保护下的映射查询/惰性创建→会话实例/ asyncio.Lock
-#"""
 """
-agent_framework/security/session_registry.py会话映射注册表
+services/session_registry.py会话映射注册表
+"""
 
-实现contracts.SessionRegistryPort：
--内部dict[str, Any]维护session_id →会话实例映射（不import ChatSession，
-用Any持有，避免反向依赖services包）；
--内部dict[str, asyncio.Lock]维护每会话一把生成锁（按会话隔离互斥）；
--映射读写为事件循环内同步代码，无await交错，暂不引入全局互斥锁；
--会话实例由构造函数注入的session_factory惰性创建；
-  factory为None时get_or_create抛ValueError（唯一允许的异常路径）
 """
+架构作用：会话映射注册表模块，按session_id持有会话实例与每会话生成锁
+调用方：app/services/__init__.py的ChatFacade取会话、取锁、删档回收
+数据流：session_id →映射查询/惰性创建→会话实例/ asyncio.Lock
+"""
+
 from __future__ import annotations
 
 import asyncio
 from typing import Any, Callable, Dict, Optional
 
-from ..contracts import SessionRegistryPort
+from app.agent_framework.contracts import SessionRegistryPort
 
 #工厂类型别名：接收session_id，返回会话实例
 SessionFactory = Callable[[str], Any]
@@ -42,10 +36,9 @@ class SessionRegistry(SessionRegistryPort):
         #_mu当前未启用：映射操作均为单线程事件循环内的同步代码，无await交错，暂不需要互斥
         #若未来跨线程使用本注册表，应恢复此锁并包住映射读写
 
-
-    #"""
-    #查询与创建：同步读写映射，协程间无await交错；工厂调用同步执行
-    #"""
+    """
+    查询与创建：同步读写映射，协程间无await交错；工厂调用同步执行
+    """
 
     def get(self, session_id: str) -> Optional[Any]:
         """按session_id取已绑定的会话实例；不存在返回None。"""
@@ -72,9 +65,9 @@ class SessionRegistry(SessionRegistryPort):
             lock = self._locks.setdefault(session_id, lock)
         return lock
 
-    #"""
-    #实现类新增能力（不改冻结端口）：删档后回收会话实例与锁，避免注册表无限增长
-    #"""
+    """
+    实现类新增能力（不改冻结端口）：删档后回收会话实例与锁，避免注册表无限增长
+    """
     def evict(self, session_id: str) -> None:
         """移除指定会话的实例与锁；不存在时静默返回，不做任何事。"""
         self._sessions.pop(session_id, None)

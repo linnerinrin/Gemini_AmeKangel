@@ -11,28 +11,17 @@ api/chat/settings_routes.py模型设置接口（只做OpenAI兼容厂商）
 """
 
 import asyncio
-from urllib.parse import urlparse
 
 import httpx
 from fastapi import APIRouter, HTTPException
 from openai import AsyncOpenAI
 
-from app.agent_framework.security.credential_policy import CredentialPolicy
-from app.agent_framework.security.egress_guard import EgressGuard
-from app.agent_framework.security.audit import PrintAuditSink
-from app.agent_framework.contracts import AuditEvent
 from app.api.chat.chat_routes import require_idle
 from app.api.chat.settings_schemas import LLMSettingsUpdate, LLMTestRequest
 from app.config.llm_import import load_llm_settings
 
 #按文件路径加载（app.services在测试里会被换成替身包，包级导入会失败）
 llm_settings = load_llm_settings()
-
-#凭据-地址绑定与出站校验走框架端口
-credential_policy = CredentialPolicy()
-egress_guard = EgressGuard()
-#审计默认落print；需要持久化时替换AuditSinkPort实现
-audit_sink = PrintAuditSink()
 
 router = APIRouter()
 
@@ -81,31 +70,12 @@ async def update_llm_settings(request: LLMSettingsUpdate):
             for name, profile in request.profiles.items()
         },
     }
-    #保存路径同样做出站校验：校验通过不等于允许外发，落盘前再挡一次
-    if not llm_settings.allow_private_base_url():
-        for name, draft in payload["profiles"].items():
-            #空地址/非http(s)语法交给validate_profile报422，出站校验不抢输入错误的提示
-            parsed = urlparse(draft["base_url"])
-            if parsed.scheme not in ("http", "https") or not parsed.netloc:
-                continue
-            if not egress_guard.allow(draft["base_url"]):
-                audit_sink.record(AuditEvent(
-                    action="blocked_egress", identity="anonymous",
-                    detail={"provider": name, "base_url": draft["base_url"]},
-                ))
-                raise HTTPException(
-                    status_code=400,
-                    detail="目标地址不允许外发，请使用公网接口地址（本地模型可设 LLM_ALLOW_PRIVATE_BASE_URL=1）",
-                )
+    #保存路径上的凭据-地址绑定由llm_settings.apply_update内的
+    #_assert_key_binding_unchanged统一校验（地址变更必须重输key），这里不重复拦
     try:
         llm_settings.apply_update(payload)
     except llm_settings.LLMSettingsError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    #切换模型属敏感动作：审计埋点（不含key等敏感字段）
-    audit_sink.record(AuditEvent(
-        action="switch_model", identity="anonymous",
-        detail={"active": payload.get("active"), "providers": sorted(payload.get("profiles", {}).keys())},
-    ))
     #保存后立刻回读一次：前端拿到的就是落盘后的真实状态（key仍是掩码）
     return llm_settings.settings_view()
 
@@ -187,18 +157,11 @@ async def test_llm_settings(request: LLMTestRequest):
     key_overridden = bool(request.api_key)
     #凭据-地址绑定：候选地址与生效地址不一致且未显式携带key时，
     #不得把已保存key发往候选地址
-    if not credential_policy.allow_carry(effective["base_url"], candidate_base_url, key_overridden) and not key_overridden:
+    if not key_overridden and llm_settings.normalize_base_url(candidate_base_url) != llm_settings.normalize_base_url(effective["base_url"]):
         raise HTTPException(
             status_code=422,
             detail="覆盖 base_url 时必须显式提供 api_key，不允许复用已保存密钥",
         )
-    #出站校验：目标地址命中回环/内网/链路本地或DNS解析异常即拒绝
-    if not egress_guard.allow(candidate_base_url):
-        audit_sink.record(AuditEvent(
-            action="auth_failed", identity="anonymous",
-            detail={"reason": "egress_blocked", "provider": provider},
-        ))
-        raise HTTPException(status_code=400, detail="目标地址不允许外发")
     draft = {
         "base_url": candidate_base_url,
         "model": request.model or effective["model"],
@@ -217,6 +180,6 @@ async def test_llm_settings(request: LLMTestRequest):
     )
     return {"provider": provider, "model": profile.model, "base_url": profile.base_url, **result}
 
-#保存端点先做egress_guard出站校验（命中回环/内网/链路本地即400，
-#LLM_ALLOW_PRIVATE_BASE_URL=1时放行），再交给llm_settings.apply_update；
-#地址变更未显式重输key由llm_settings._assert_key_binding_unchanged在落盘前拒绝。
+#保存与探测路径的地址校验统一在llm_settings：validate_profile内的_assert_public_host
+#按LLM_ALLOW_PRIVATE_BASE_URL决定是否放行回环/私网，_assert_key_binding_unchanged
+#在落盘前拒绝“地址变更但未提交新key”。

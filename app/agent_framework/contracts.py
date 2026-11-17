@@ -1,6 +1,6 @@
 #"""
-#架构作用：新增agent框架的统一契约层，定义安全/只读/回复/上下文四类端口
-#调用方：app/agent_framework下各模块 + app/managers与app/api的10个接入点（见各默认实现处的引用标注）
+#架构作用：新增agent框架的统一契约层，定义只读/回复/上下文/模型/MCP各类端口
+#调用方：app/agent_framework下各模块 + app/managers与app/api的接入点（见各默认实现处的引用标注）
 #数据流：端口定义→各模块默认实现→接入方在调用点直接实例化使用
 #"""
 """
@@ -9,7 +9,7 @@ agent_framework/contracts.py框架统一契约（冻结版）
 本文件是全框架唯一允许被所有模块共同依赖的抽象层：
 -端口（Protocol/ABC）只描述「需要什么能力」，不知道实现长什么样；
 -默认数据类（不可变）描述模块间交换的形状；
--各模块（security / readonly / response / context_budget）只依赖本文件，
+-各模块（readonly / response / context_budget / model_adapter / mcp_client）只依赖本文件，
 模块之间不得互相import，保证依赖方向单向、无环
 
 依赖方向：具体模块→ contracts（抽象），contracts不依赖任何实现，符合依赖倒置
@@ -23,66 +23,7 @@ from typing import Any, Dict, List, Optional, Protocol, Sequence, runtime_checka
 
 
 #"""
-#模块一：安全端口
-#出站校验、凭据策略、会话映射、审计骨架各管一件事；端口只签名不落地
-#"""
-
-
-@runtime_checkable
-class EgressGuardPort(Protocol):
-    """出站URL校验端口：判断一次外发请求是否被允许。
-
-    实现必须拒绝：非http/https协议、回环地址、内网段、169.254.169.254。
-    只读判定，不发送请求，不持有网络依赖。
-    """
-
-    def allow(self, url: str) -> bool:
-        """url允许外发返回True，否则False；不抛异常，失败即拒绝。"""
-        ...
-
-
-@runtime_checkable
-class CredentialPolicyPort(Protocol):
-    """凭据-地址绑定策略端口：防止已存key被发往非可信地址。
-
-    覆盖settings测试路由的场景：
-    请求未携带api_key时，不得把已保存key发往「非当前生效地址」。
-    """
-
-    def allow_carry(self, saved_base_url: str, candidate_base_url: str,
-                    key_overridden: bool) -> bool:
-        """是否允许携带已存key访问候选地址。
-
-        saved_base_url：当前生效（已保存）的base_url；
-        candidate_base_url：本次请求要访问的base_url；
-        key_overridden：请求是否显式携带了api_key。
-        返回False时调用方必须拒绝本次携带，并提示配置key。
-        """
-        ...
-
-
-@runtime_checkable
-class AuditSinkPort(Protocol):
-    """审计落点端口：只接收事件，不关心存储介质。"""
-
-    def record(self, event: "AuditEvent") -> None:
-        """记录一条审计事件；实现不得因存储失败影响主流程。"""
-        ...
-
-
-@dataclass(frozen=True)
-class AuditEvent:
-    """一条审计事件：什么身份、什么时间、做了什么、结果如何。"""
-
-    action: str            #动作名，如switch_model / switch_session / auth_failed
-    identity: str          #请求身份（会话id或token摘要），未知写"anonymous"
-    trace_id: str = ""     #链路id，接入后由中间件注入
-    detail: Dict[str, Any] = field(default_factory=dict)  #附加信息（脱敏后）
-    timestamp: float = 0.0  #由实现补时间戳，构造方不必关心
-
-
-#"""
-#模块二：只读工具端口
+#模块一：只读工具端口
 #路径安全判定与文件读取分离；读取结果统一走ReadResult形状
 #"""
 
@@ -130,8 +71,8 @@ class ReadResult:
 class BrevityCheckerPort(Protocol):
     """回复简短性检查端口：纯函数判定，无副作用。"""
 
-    def check(self, text: str, *, task_mode: str = "chat") -> "BrevityVerdict":
-        """检查回复文本；task_mode=work时应用放宽后的上限。"""
+    def check(self, text: str) -> "BrevityVerdict":
+        """检查回复文本。"""
         ...
 
 

@@ -122,7 +122,7 @@ def _order_of(prompt, *segments):
     return [prompt.index(segment) for segment in segments]
 
 
-def test_initial_prompts_follow_base_role_task_order(monkeypatch):
+def test_initial_prompts_follow_base_role_order(monkeypatch):
     """三个节点属性在构造后就是按mode装配好的"""
     session = make_session(monkeypatch)
 
@@ -130,25 +130,23 @@ def test_initial_prompts_follow_base_role_task_order(monkeypatch):
     assert session.reflection_prompt == chat_module.config.reflection_prompt_for()
     base = chat_module.config.BASE_PROMPT
     role = chat_module.config.ROLE_PROMPT[session.current_mode]
-    task = chat_module.config.TASK_PROMPT
-    assert session.sys_prompt == chat_module.config.join_prompt(base, role, task)
-    #顺序必须是base -> role -> task
-    positions = _order_of(session.sys_prompt, base, role, task)
-    assert positions == sorted(positions), f"装配顺序不是 base->role->task: {positions}"
+    assert session.sys_prompt == chat_module.config.join_prompt(base, role)
+    #顺序必须是base -> role
+    positions = _order_of(session.sys_prompt, base, role)
+    assert positions == sorted(positions), f"装配顺序不是 base->role: {positions}"
 
 
 def test_load_mode_rebuilds_role_segment(monkeypatch):
     """场景轴变化只换role段"""
     session = make_session(monkeypatch)
     asyncio.run(session.single_chat("hello"))
-    task = chat_module.config.TASK_PROMPT
 
     session.load_mode("2")
 
     assert session.current_mode == "2"
     assert chat_module.config.ROLE_PROMPT["2"] in session.sys_prompt
     assert chat_module.config.ROLE_PROMPT["0"] not in session.sys_prompt
-    assert session.sys_prompt.endswith(task)
+    assert session.sys_prompt.endswith(chat_module.config.ROLE_PROMPT["2"])
     assert session.call_prompt == chat_module.config.call_prompt_for()
     assert session.reflection_prompt == chat_module.config.reflection_prompt_for()
 

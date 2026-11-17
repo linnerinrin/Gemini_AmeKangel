@@ -25,14 +25,17 @@ from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field
 
-from app.agent_framework.security.credential_policy import (
-    CredentialPolicy,
-    normalize_base_url,
-)
 from app.config.config import config
 
-#凭据—地址绑定策略：保存路径与探测端点共用同一套判定，避免两处规则漂移
-_credential_policy = CredentialPolicy()
+
+def normalize_base_url(url: str) -> str:
+    """base_url归一化：去首尾空白、转小写、去掉末尾全部斜杠。
+
+    纯函数；输入为空串/None时返回空串，比对时空串不等于任何非空地址。
+    """
+    if not url:
+        return ""
+    return url.strip().lower().rstrip("/")
 
 #掩码里固定保留的头尾长度：sk-5e1****c57e这种形状
 MASK_HEAD = 7
@@ -429,7 +432,7 @@ def validate_profile(provider: str, profile: dict, *, require_key: bool = True) 
 #保存路径上的凭据—地址绑定：只改base_url不重输key时，resolve_api_key会静默沿用旧key，
 #落盘后就变成“新地址+旧密钥”。这里在合并落盘前拦截：地址（归一化后）发生变化，
 #而本次没有提交新的明文key（留空或回传掩码），一律拒绝保存。
-#归一化（大小写/末尾斜杠）差异不算地址变更，复用CredentialPolicy的同一规则。
+#归一化（大小写/末尾斜杠）差异不算地址变更，两者走同一套normalize_base_url规则。
 #"""
 def _assert_key_binding_unchanged(provider: str, profile: dict) -> None:
     """地址变更必须显式重输API Key，防止已存密钥被转发到新端点。"""

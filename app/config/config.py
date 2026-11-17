@@ -1,22 +1,27 @@
-#"""
-#架构作用：集中读取环境配置、提示词与推理参数，并提供路径和提示词装配属性
-#调用方：服务、模型/检索管理器及工具适配器；模块末尾创建全局配置单例
-#数据流：环境变量/.env + prompts文件→ Config →启动时模型与图构造
-#"""
 """
-config/config.py配置文件
+config/config.py
 """
+
+
+"""
+架构作用：集中读取环境配置、提示词与推理参数，并提供路径和提示词装配属性
+调用方：服务、模型/检索管理器及工具适配器；模块末尾创建全局配置单例
+数据流：环境变量/.env + prompts文件→ Config →启动时模型与图构造
+"""
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
-#"""
-#模块一：配置模型与默认值
-#用pydantic-settings把.env /环境变量读成强类型字段；无默认值的字段（INITIAL_MODE、
-#SHORT_MEMORY_LEN、BI/CROSS_ENCODER_PATH、MYSQL_USER/PASSWORD等）缺失时导入即失败
-#"""
+"""
+模块一：配置模型与默认值
+用pydantic-settings把.env /环境变量读成强类型字段；无默认值的字段（INITIAL_MODE、
+SHORT_MEMORY_LEN、BI/CROSS_ENCODER_PATH、MYSQL_USER/PASSWORD等）缺失时导入即失败
+"""
 class Config(BaseSettings):
     model_config = SettingsConfigDict(env_file=PROJECT_ROOT/".env",extra="ignore",env_file_encoding="utf-8",)
 
@@ -98,7 +103,6 @@ class Config(BaseSettings):
     SYS_PROMPT: dict = {}
     BASE_PROMPT: str = ""
     ROLE_PROMPT: dict = {}
-    TASK_PROMPT: str = ""
     REFLECTION_PROMPT: str = ""
     CALL_PROMPT: str = ""
 
@@ -106,7 +110,7 @@ class Config(BaseSettings):
 
     #"""
     #模块二：提示词文件路径与装配
-    #场景轴mode(0-3)决定角色段；装配顺序base -> role -> task不可调换，
+    #场景轴mode(0-3)决定角色段；装配顺序base -> role不可调换，
     #三个属性分别被图的三个节点读取
     #"""
     #提示词文件路径
@@ -130,7 +134,6 @@ class Config(BaseSettings):
             "3": read(str(PROJECT_ROOT / "prompts" / "role" / "ame_live.txt")),
         }
         self.BASE_PROMPT = read(self.base_path)
-        self.TASK_PROMPT = read(str(PROJECT_ROOT / "prompts" / "task" / "chat.txt"))
         self.CALL_PROMPT = read(self.call_prompt_path)
         self.REFLECTION_PROMPT = read(self.reflection_prompt_path)
         #SYS_PROMPT保持"非空字符串"的形状（base + role），完整提示词见sys_prompt_for
@@ -143,7 +146,7 @@ class Config(BaseSettings):
         from app.tools.adapters.openai import to_openai_schemas
         self.TOOLS_SCHEMAS = to_openai_schemas()
 
-    #提示词装配：base -> role -> task的顺序不可调换
+    #提示词装配：base -> role的顺序不可调换
     @staticmethod
     def join_prompt(*segments) -> str:
         """按顺序拼接提示词段，跳过空段，段间用空行分隔。"""
@@ -154,7 +157,7 @@ class Config(BaseSettings):
         mode = str(mode)
         if mode not in self.ROLE_PROMPT:
             raise ValueError(f"未知聊天模式: {mode}")
-        return self.join_prompt(self.BASE_PROMPT, self.ROLE_PROMPT[mode], self.TASK_PROMPT)
+        return self.join_prompt(self.BASE_PROMPT, self.ROLE_PROMPT[mode])
 
     def call_prompt_for(self) -> str:
         """决策节点提示词。"""
@@ -165,13 +168,11 @@ class Config(BaseSettings):
         return self.REFLECTION_PROMPT
 
 
-    #"""
-    #模块三：推理参数与工具schema出口
-    #max_tokens=0表示不放进请求体（交给模型自行决定长度）；工具schema由注册表经
-    #OpenAI适配器派生，是本进程对模型可见的唯一一份
-    #"""
-    #参数包装
-    #max_tokens为0时不放入请求体，交给模型自行决定长度（避免思考链/回答被截断）
+
+    """
+    参数包装
+    max_tokens为0时不放入请求体，交给模型自行决定长度（避免思考链/回答被截断）
+    """
     @staticmethod
     def _build_para(max_tokens, temperature, top_p) -> dict:
         para = {"temperature": temperature, "top_p": top_p}
@@ -209,5 +210,3 @@ class Config(BaseSettings):
 
 
 config= Config()
-
-#TASK_PROMPT固定为prompts/task/chat.txt；场景轴由mode(0-3)决定角色段

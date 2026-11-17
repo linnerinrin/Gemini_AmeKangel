@@ -29,8 +29,6 @@ STATUS_DEFAULTS = {
     "mental": config.DEFAULT_MENTAL,
 }
 
-#Schema migration is performed during application startup, not during refresh.
-
 #记忆模块mysql session和chat两表
 #创建会话->创建session实例->看time字段大于3报错->随机一个id->memory空
 #聊天->创建一个chat实例->存query reply

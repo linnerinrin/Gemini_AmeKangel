@@ -1,11 +1,13 @@
-#"""
-#架构作用：ChatSession的LangGraph编排器，串联决策、工具、回答与严格审查
-#数据流：AgentState增量补丁→ reducer合并→条件边；正式历史由会话层最后写入
-#本类通过session反向引用其他管理器，节点读取的是共享实时状态而非请求快照
-#"""
 """
 managers/GraphManager.py  LangGraph图管理器
 """
+
+"""
+架构作用：ChatSession的LangGraph编排器，串联决策、工具、回答与严格审查
+数据流：AgentState增量补丁→ reducer合并→条件边；正式历史由会话层最后写入
+本类通过session反向引用其他管理器，节点读取的是共享实时状态而非请求快照
+"""
+
 import operator
 from typing import Annotated, List, TypedDict
 
@@ -24,10 +26,10 @@ class ReflectionError(RuntimeError):
     """审查未通过；本次草稿不提交为正式历史。"""
 
 
-#"""
-#列表字段使用operator.add追加reducer：节点必须返回当次增量而非完整累计列表
-#标量字段由后一次补丁覆盖；计数用于限制循环，不是数据库事务状态
-#"""
+"""
+列表字段使用operator.add追加reducer：节点必须返回当次增量而非完整累计列表
+标量字段由后一次补丁覆盖；计数用于限制循环，不是数据库事务状态
+"""
 class AgentState(TypedDict):
     agent_message:Annotated[List[dict],operator.add]  #agentnode节点自迭代传递的信息仅用于收集tooltext
 

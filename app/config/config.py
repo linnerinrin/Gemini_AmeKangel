@@ -23,7 +23,7 @@ class Config(BaseSettings):
     #fastapi配置
     APP_NAME:str="唐人的APP"
     APP_VERSION:str="1.0.0"
-    HOST:str="0.0.0.0"
+    HOST:str="127.0.0.1"
     PORT:int=5577
     DEBUG:bool=False
 

@@ -17,7 +17,7 @@ setlocal
 cd /d "%~dp0"
 
 set "PY=%~dp0venv\Scripts\python.exe"
-set "APP_HOST=0.0.0.0"
+set "APP_HOST=127.0.0.1"
 set "APP_PORT=5577"
 
 echo.

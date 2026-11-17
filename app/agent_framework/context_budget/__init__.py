@@ -1,6 +1,6 @@
 #"""
 #架构作用：agent_framework.context_budget子包边界；承载token计数与窗口策略
-#调用方：未来适配器经contracts.TokenCounterPort / WindowPolicyPort注入后调用
+#调用方：app/managers/MemoryManager.py:13-14 导入 TiktokenCounter / TurnWindowPolicy 并模块级实例化
 #数据流：文本→ counter计数；轮数上限→ window换算为消息条数上限
 #"""
 """

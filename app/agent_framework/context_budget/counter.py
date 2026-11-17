@@ -1,6 +1,6 @@
 #"""
 #架构作用：TokenCounterPort的实现集——默认字符估算+可选tiktoken增强
-#调用方：未来适配器在上下文预算环节注入；当前不被原项目运行路径引用
+#调用方：app/managers/MemoryManager.py:22 模块级实例化 _TOKEN_COUNTER = TiktokenCounter()
 #数据流：文本→ count() → token估算数（int），永不抛异常
 #"""
 """

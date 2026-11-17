@@ -1,7 +1,7 @@
 # 改造方案：聊天/工作双模式 · tools 转 MCP · 模型设置面板
 
-> 本文档为**方案与审计**，本轮不修改代码。
-> 所有结论均基于本轮只读勘察，附 `文件:行号` 证据；不确定项集中在 §6。
+> 本文档为**方案与审计**，原版基于只读勘察，附 `文件:行号` 证据；不确定项集中在 §6。
+> 标注 **（已修复）** 的条目在后续清理中已处理，保留原文以便追溯。
 
 ---
 
@@ -18,13 +18,13 @@
 | 一致性改由测试按 `registry.py` 钉死（不再是「两份定义强制同名」） | [test_tools_registry.py:54-84](../tests/unit/test_tools_registry.py#L54-L84)、[test_mcp_server.py](../tests/unit/test_mcp_server.py) |
 | **API key 明文硬编码在源码里**，且 `.env` 中**没有**这三项 → 代码默认值就是线上生效值 | [config.py:31-33](../app/config/config.py#L31-L33)、[.env](../.env) 无 `DEEPSEEK_*` |
 | 全仓**没有任何热更新机制**（`importlib.reload` / `setattr(config` 零命中） | 勘察确认 |
-| `MEMORY_FILE_PATH` 是死字段；`data/` 目录不存在 | [config.py:66](../app/config/config.py#L66) |
+| ~~`MEMORY_FILE_PATH` 是死字段；`data/` 目录不存在~~ **（已修复：该字段已删除）** | 原 [config.py:66](../app/config/config.py#L66) |
 | `app/api/logger`、`app/api/vision` 是**空文件**；`app/api/auth` 源码已删只剩 `.pyc` | 勘察确认 |
 | `ame_knowledge.txt` 与 `kangel_knowledge.txt` **内容完全相同**（同 hash）；`.env` 里 `KNOWLEDGE_AME/KANGEL` 是失效残留 | 勘察确认 |
 | `GraphManager.load_mode` / `FuncCallManager.load_mode` 存的 `current_mode` **从未被读取**（死代码） | [GraphManager.py:240-241](../app/managers/GraphManager.py#L240-L241)、[FuncCallManager.py:32-33](../app/managers/FuncCallManager.py#L32-L33) |
 | `mcp` 2.3.0 与 `mcp-types` 2.3.0 **已安装**（P6b 落地；注意 2.x 里 `FastMCP` 已改名 `MCPServer`，`mcp.server.fastmcp` 是「导入即报错」的迁移提示模块） | `pip list`、[mcp/server.py](../app/mcp_server/server.py) |
-| `.gitignore` 是 **UTF-16LE** 编码，已忽略 `prompts/` → **提示词文件不受版本控制** | [.gitignore](../.gitignore) |
-| `.gitignore` **未包含 `.env`**，也未包含 `data/` → 含 MySQL/JWT/SMTP 明文密钥的 `.env` 有被 `git add -A` 提交的风险 | [.gitignore](../.gitignore) |
+| ~~`.gitignore` 是 **UTF-16LE** 编码，已忽略 `prompts/` → 提示词文件不受版本控制~~ **（已修复：现为 UTF-8，`prompts/` 10 个文件已入库）** | [.gitignore](../.gitignore) |
+| ~~`.gitignore` **未包含 `.env`**，也未包含 `data/`~~ **（已修复：`.env` 见 :31，`/data/` 见 :35）** | [.gitignore](../.gitignore) |
 | 模型客户端在 import 时构造，base_url/key 冻结 | [ModelManager.py:56-59](../app/managers/ModelManager.py#L56-L59) |
 | 控制面板只有 3 个音量相关控件，无任何下拉/文本输入 | [desktop.html:580-614](../static/desktop.html#L580-L614) |
 | 控制面板窗口高度受限，加控件会溢出 | [desktop.css:1902](../static/css/desktop.css#L1902) `height: clamp(200px,35vh,350px)` |
@@ -323,7 +323,7 @@ R10 曾把原需求「按 `\n` 分段」改成**显式分隔标记 `@@@`**（单
 - `app/api/logger`、`app/api/vision` 是空文件；`app/api/auth` 只剩 `.pyc`（[api/__init__.py](../app/api/__init__.py) 只导出 chat_router）
 - `MemoryManager.load_status` 与 `refresh` 重复计算状态提示词
 - `ame_knowledge.txt` 与 `kangel_knowledge.txt` 内容完全相同（同 hash）→ 可合并为一个文件，但会削弱「每个 mode 独立知识库」的扩展位，建议保留但注明
-- `MemoryManager.MEMORY_FILE_PATH`（[config.py:66](../app/config/config.py#L66)）与 `.env` 的 `KNOWLEDGE_AME/KNOWLEDGE_KANGEL` 均为死配置
+- ~~`MemoryManager.MEMORY_FILE_PATH`（[config.py:66](../app/config/config.py#L66)）~~ **（已删除）** 与 `.env` 的 `KNOWLEDGE_AME/KNOWLEDGE_KANGEL` 均为死配置
 - `GraphManager.load_mode` / `FuncCallManager.load_mode` 存的 `current_mode` 从未被读取
 
 **R14｜契约测试未覆盖 `/chat/history`**

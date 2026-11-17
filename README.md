@@ -10,7 +10,8 @@
 
 - Windows + Python 3.10+
 - MySQL（启动时会自动建表与迁移）
-- GPU 可选（向量检索用 faiss-cpu，无 GPU 也能跑）
+- GPU 可选：向量检索用 faiss-cpu（CPU 版），但嵌入/重排模型由 `RAG_DEVICE` 决定落在哪个设备上。
+  **默认值是 `cuda`，没有 N 卡时必须在 `.env` 里设 `RAG_DEVICE=cpu`，否则加载模型会直接报错。**
 
 ### 首次安装
 
@@ -40,9 +41,10 @@ start.bat 5599       :: 端口被占用时指定其他端口
 Gemini_AmeKangel/
 ├─ start.bat            # Windows 一键启动脚本（uvicorn app.main:app）
 ├─ requirements.txt     # Python 依赖
-├─ contracts/           # 前后端契约（api_contract.json、角色 idx 映射）
+├─ contracts/           # 前后端契约（api_contract.json、role2idx.json 角色映射）
 ├─ prompts/             # 提示词：base / role(ame,kangel,dangel,ame_live) / task(chat) / 知识库
-├─ repository/          # 数据层：conn.py（连接池）、init_db.py（建表）
+├─ docs/                # 设计文档：mcp-server.md、plan-chat-work-mode-mcp-llm.md（含架构审计）
+├─ repository/          # 数据层：conn.py（线程本地连接，非连接池）、init_db.py（建表）
 ├─ static/              # 前端：boot.html / desktop.html / css / js / assets（角色逐帧素材）
 ├─ tests/               # pytest 单测与集成测试 + Node .cjs 前端契约测试
 └─ app/                 # 后端主体（FastAPI）
@@ -58,9 +60,12 @@ Gemini_AmeKangel/
    │                    #   FuncCallManager（工具执行）、AccountManager（3 个存档位）
    ├─ tools/            # registry.py（工具唯一来源：7 核心 + 4 只读 + MCP 外部工具）、adapters/
    ├─ mcp_server/       # server.py：把 registry 的 external 工具暴露为 MCP Server
-   └─ agent_framework/  # contracts.py（端口契约）、model_adapter（OpenAI 兼容 HTTP 客户端）、
-                        #   mcp_client（stdio MCP 客户端+工具桥）、readonly（文件只读工具+PathGuard）、
-                        #   context_budget（token 计数与会话窗口）、security（审计/出站校验/凭据策略/会话注册表）
+   └─ agent_framework/  # 能力端口层：contracts.py（端口契约）+ 5 个子包
+                        #   security 审计/出站校验/凭据策略/会话注册表（已接入 api/chat）
+                        #   readonly 只读文件工具+PathGuard（已接入 tools/registry、FuncCallManager）
+                        #   context_budget token 计数与会话窗口（已接入 MemoryManager）
+                        #   mcp_client stdio MCP 客户端+工具桥（已接入 tools/registry）
+                        #   model_adapter OpenAI 兼容客户端（半接入：仅非流式路径）
 ```
 
 ### 核心后端文件作用
@@ -71,16 +76,16 @@ Gemini_AmeKangel/
 | `app/services/chat_session.py` | 单个存档的运行时：装配系统提示词、跑生成管线、写记忆、结算状态与涨粉 |
 | `app/services/__init__.py` | 会话注册表 + `ChatFacade` 门面；`resolve_current()` 在 await 前锁定会话快照，防止换绑串档 |
 | `app/services/llm_settings.py` | 模型设置的读写、掩码、校验；凭据-地址绑定（改 base_url 必须重填 key），出站地址校验 |
-| `app/managers/GraphManager.py` | LangGraph 生成管线：检索 → 生成 → 审查 → （不通过则带问题重写），全程推送思考链事件 |
+| `app/managers/GraphManager.py` | LangGraph 生成管线：四节点 agent → generate_reply → reflection，tools 节点按需介入；全程推送思考链事件 |
 | `app/managers/MemoryManager.py` | 短期/长期记忆、状态栏（好感/压力/心理/粉丝）落库；直播模式每轮按概率涨粉 |
-| `app/managers/ModelManager.py` | 模型统一入口：OpenAI 兼容协议、超时/重试、参数透传（top_p/max_tokens 按 >0 条件携带） |
+| `app/managers/ModelManager.py` | 模型统一入口：OpenAI 兼容协议（`AsyncOpenAI` SDK 为主，流式与非流式都走它；`agent_framework.model_adapter` 只兜底非流式路径）、超时/重试、参数透传（top_p/max_tokens 按 >0 条件携带） |
 | `app/managers/RAGManager.py` | RAG：bi-encoder 向量召回（faiss）+ cross-encoder 重排，本地模型目录离线加载 |
 | `app/managers/FuncCallManager.py` | 工具执行调度；只读文件工具的读取边界由 `READONLY_ROOTS` 决定 |
 | `app/tools/registry.py` | 工具唯一事实来源：schema、执行闭包、scope；同一份定义喂给模型、LangGraph 与 MCP |
 | `app/mcp_server/server.py` | 把 5 个无状态工具（output_time / retrieve_knowledge / retrieve_context / rewrite / search_web）暴露为 MCP Server，schema 直接取自注册表 |
-| `app/agent_framework/model_adapter/` | OpenAI 兼容 HTTP 客户端（httpx），任何 OpenAI 兼容端点都可接入 |
+| `app/agent_framework/model_adapter/` | OpenAI 兼容客户端（httpx，`ChatClientPort` 默认实现）。**半接入**：仅当「非流式 + 未注入替身」时由 ModelManager 走这里，主链路与全部流式调用走 openai SDK |
 | `app/agent_framework/security/` | 审计事件、出站地址校验（SSRF 防护）、凭据策略、每会话锁注册表 |
-| `repository/conn.py` | MySQL 连接与事务边界 |
+| `repository/conn.py` | MySQL 访问门面：`threading.local` 线程本地单连接（首次执行 SQL 才建连），非连接池；无事务上下文，调用方显式 commit |
 | `repository/init_db.py` | 启动建表；老库由 `app/config/schema.py` 幂等迁移 |
 
 ### 技术栈
@@ -88,9 +93,9 @@ Gemini_AmeKangel/
 - **后端**：FastAPI + Uvicorn、Pydantic v2 / pydantic-settings、PyMySQL（MySQL）
 - **生成管线**：LangGraph + langchain-core
 - **RAG**：sentence-transformers（bi-encoder + cross-encoder）、faiss-cpu、HuggingFace 本地模型
-- **模型接入**：OpenAI 兼容协议（httpx），支持 deepseek / openai / custom 等厂商
+- **模型接入**：OpenAI 兼容协议，主链路用 `openai` SDK 的 `AsyncOpenAI`（支持流式），`httpx` 用于设置页探测端点与 `model_adapter` 的非流式兜底；支持 deepseek / openai / custom 等厂商
 - **工具协议**：MCP（Server 出口 + stdio 客户端入口）
-- **其他**：tiktoken（token 计数）、ddgs（联网搜索）、torch / transformers（本地推理依赖）
+- **其他**：tiktoken（token 计数）、ddgs（联网搜索）、sentence-transformers 及其后端 torch / transformers（本地向量与重排推理，无需 GPU）
 - **前端**：纯原生 HTML/CSS/JS，无构建步骤；SSE 流式渲染、逐帧角色动画
 - **测试**：pytest（单元+集成）、Node .cjs（前端契约测试）
 
@@ -127,7 +132,7 @@ HTTP 接口统一挂在 `/chat` 前缀下（FastAPI，端口见启动参数）�
 
 - 挂载点：`/mcp`（StreamableHTTP）；stdio 直连：`python -m app.mcp_server.server`
 - 暴露的 5 个无状态工具：`output_time`、`retrieve_knowledge`、`retrieve_context`、`rewrite`、`search_web`
-- 其余：`GET /` 返回前端入口页；`/static/*` 为静态资源
+- 其余：`GET /` 返回 `static/boot.html`（开机动画页，随后进入 `static/desktop.html` 主界面）；`/static/*` 为静态资源
 
 ---
 
@@ -158,11 +163,16 @@ HTTP 接口统一挂在 `/chat` 前缀下（FastAPI，端口见启动参数）�
 
 ```
 用户消息 → 路由绑定会话快照 → GraphManager(LangGraph)
-  → RAG 检索 + 工具调用（思考链实时推送到前端）
-  → 生成回复 → 审查节点（不通过则带问题重写，上限 MAX_REFLECTION_TURNS）
+  → agent 节点：模型决定直接回答，还是调用工具
+      ├─ 需检索/查时间/搜索/改写 → tools 节点执行 → 回到 agent（可多轮）
+      └─ 否则 → generate_reply 节点
+  → reflection 审查节点（不通过则带问题重写，上限 MAX_REFLECTION_TURNS）
   → SSE 分段推送 / 整段返回
   → MemoryManager 落库（历史+记忆+状态）→ 直播档结算涨粉
 ```
+
+> RAG（`retrieve_knowledge` / `retrieve_context`）是 **agent 可选的工具**，不是管线的固定一环：
+> 模型认为需要外部资料时才会经由 tools 节点检索，闲聊轮次不触发。
 
 ---
 

@@ -41,6 +41,7 @@ start.bat 5599       :: 端口被占用时指定其他端口
 Gemini_AmeKangel/
 ├─ start.bat            # Windows 一键启动脚本（uvicorn app.main:app）
 ├─ requirements.txt     # Python 依赖
+├─ LICENSE              # 静态素材版权声明（static/assets 归属）
 ├─ contracts/           # 前后端契约（api_contract.json、role2idx.json 角色映射）
 ├─ prompts/             # 提示词：base / role(ame,kangel,dangel,ame_live) / task(chat) / 知识库
 ├─ docs/                # 设计文档：mcp-server.md、plan-chat-work-mode-mcp-llm.md（含架构审计）
@@ -182,3 +183,20 @@ HTTP 接口统一挂在 `/chat` 前缀下（FastAPI，端口见启动参数）�
 venv\Scripts\python.exe -m pytest tests/unit tests/integration tests/test_contract_backend.py tests/test_stream_behavior.py -q
 for %f in (tests\*.cjs) do node %f
 ```
+
+---
+
+## 静态素材版权声明
+
+本仓库 `static/assets/` 目录下的角色立绘、逐帧动画、音频、字体、图标等资源，
+以及 `static/boot.html` 中的 NGO BIOS 等还原文案，其著作权归各自原始权利人所有。
+
+其中包括 NEEDY GIRL OVERDOSE / NEEDY STREAMER OVERLOAD（中文名《主播女孩重度依赖》，
+由 Why so serious, Inc. 旗下品牌 WSS playground 发行）的开发商与发行商，
+以及相关字体与音乐作品的作者。
+
+本项目对上述静态素材不主张任何权利，亦未取得再分发授权，仅作为个人学习、
+研究与技术验证用途存在。
+
+> 如需二次分发、公开部署或商用本项目，请自行就上述素材取得权利人许可，
+> 并自行承担由此产生的全部责任。详见 [LICENSE](LICENSE)。

@@ -1,11 +1,14 @@
-#"""
-#架构作用：ChatSession与工具使用的记忆/角色状态门面，直接访问session、chat表
-#数据流：存档/场景/任务轴→ SQL →短记忆队列、长记忆、历史、状态提示词；写入显式提交
-#本对象由包级单例持有，字段随绑定与刷新改变，不是不可变的请求快照
-#"""
 """
 managers/MemoryManager.py记忆模块管理器
 """
+
+
+"""
+架构作用：ChatSession与工具使用的记忆/角色状态门面，直接访问session、chat表
+数据流：存档/场景/任务轴→ SQL →短记忆队列、长记忆、历史、状态提示词；写入显式提交
+本对象由包级单例持有，字段随绑定与刷新改变，不是不可变的请求快照
+"""
+
 import json
 from collections import deque
 from pathlib import Path
@@ -59,25 +62,25 @@ class MemoryManager:
         self.model_mgr=model_mgr
 
 
-    #"""
-    #这里只赋值，不查库；合法性留给refresh，因此失败之前已经改变当前绑定
-    #"""
+    """
+    这里只赋值，不查库；合法性留给refresh，因此失败之前已经改变当前绑定
+    """
     def bind_session_id(self,session_id):
         self.session_id = session_id
 
 
-    #"""
-    #将一轮完整问答与场景、思考链和模型元信息写入chat，立即commit
-    #"""
+    """
+    将一轮完整问答与场景、思考链和模型元信息写入chat，立即commit
+    """
     def update_short_memory(self, query, reply, thinking=None, model=None, provider=None):
         #thinking存结构化思考链JSON；没有思考内容时写NULL
         #model/provider记当次实际使用的模型；拿不到就是NULL，不能因为缺模型名挡住落库
         db("insert into chat (session_id, query, reply, mode, thinking, llm_model, llm_provider) values (%s, %s, %s, %s, %s, %s, %s)",
            (self.session_id, query, reply, self.mode, encode_thinking(thinking), model, provider))
         db.commit()
-    #"""
-    #按存档/场景筛选最近轮次，再反转为时间正序并拆成user/assistant消息
-    #"""
+    """
+    按存档/场景筛选最近轮次，再反转为时间正序并拆成user/assistant消息
+    """
     def load_short_memory(self):
         self.short_memory.clear()
         db('select query,reply from chat where session_id=%s and mode=%s order by created_at desc limit %s;',(self.session_id,self.mode,config.SHORT_MEMORY_LEN))
@@ -85,9 +88,9 @@ class MemoryManager:
             self.short_memory.append({"role":"user","content":res[0]})
             self.short_memory.append({"role": "assistant", "content":res[1]})
 
-    #"""
-    #await模型生成摘要，GenerationResult.__str__提取正文，然后更新并提交session
-    #"""
+    """
+    await模型生成摘要，GenerationResult.__str__提取正文，然后更新并提交session
+    """
     async def update_long_memory(self, memory: str):
         messages = [
             {"role": "system", "content": "总结以下对话记忆，保留重要信息："},
@@ -105,10 +108,10 @@ class MemoryManager:
         self.long_memory = self.row[0] if self.row else None
         return self.long_memory
 
-    #"""
-    #使用固定列名集合构造更新表达式，数值仍参数化；bounded三项由SQL钳制到0..100
-    #多列依次写入后一次commit，再加载状态及提示词；不在本层提供失败回滚
-    #"""
+    """
+    使用固定列名集合构造更新表达式，数值仍参数化；bounded三项由SQL钳制到0..100
+    多列依次写入后一次commit，再加载状态及提示词；不在本层提供失败回滚
+    """
     def update_status(self, followers=None, affection=None, stress=None, mental=None):
         """按增量更新状态栏；followers只增不减、无上限，其余三项钳制到0..100。"""
         updates = (
@@ -155,9 +158,9 @@ class MemoryManager:
         }
         return self.status
 
-    #"""
-    #历史读取不改变当前场景；解码思考链并保留每轮模型元信息用于回放
-    #"""
+    """
+    历史读取不改变当前场景；解码思考链并保留每轮模型元信息用于回放
+    """
     def read_history(self, mode=None):
         """读取指定mode的历史记录（只读，不改变当前记忆状态）
 
@@ -172,16 +175,16 @@ class MemoryManager:
             for res in db.fetchall()
         ]
 
-    #"""
-    #以数据库结果整体替换历史快照；引用旧列表的调用方需通过ChatSession.refresh同步
-    #"""
+    """
+    以数据库结果整体替换历史快照；引用旧列表的调用方需通过ChatSession.refresh同步
+    """
     def load_history(self, mode=None):
         self.history = self.read_history(mode)
 
-    #"""
-    #将粉丝/好感/压力/精神数值按阈值映射成角色状态片段，供提示词装配使用
-    #这里只重建字符串，不调用模型；各维度分别追加，不能用其替代数据库事实
-    #"""
+    """
+    将粉丝/好感/压力/精神数值按阈值映射成角色状态片段，供提示词装配使用
+    这里只重建字符串，不调用模型；各维度分别追加，不能用其替代数据库事实
+    """
     def set_status_prompts(self):
         self.status_prompts = ""
         if self.fol<1000:self.status_prompts += "你是一个底边主播。"
@@ -208,17 +211,17 @@ class MemoryManager:
         elif self.men<80:self.status_prompts += "你的内心非常阴暗。"
         else:self.status_prompts += "黑暗的情绪正吞没你。"
 
-    #"""
-    #更新场景轴并重新读取当前存档；任务轴是另一独立维度，决定短记忆过滤条件
-    #"""
+    """
+    更新场景轴并重新读取当前存档；任务轴是另一独立维度，决定短记忆过滤条件
+    """
     def load_mode(self,mode):
         self.mode=mode
         self.refresh(self.session_id)
 
 
-    #"""
-    #验证存档后重建队列并依次加载长记忆、状态、历史和短记忆；同步SQL无await
-    #"""
+    """
+    验证存档后重建队列并依次加载长记忆、状态、历史和短记忆；同步SQL无await
+    """
     def refresh(self,session_id):
         db('use gemini;')
         db('select id from session where id=%s;', (session_id,))

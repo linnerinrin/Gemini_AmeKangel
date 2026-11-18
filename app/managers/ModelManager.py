@@ -1,8 +1,3 @@
-#"""
-#架构作用：图节点与长记忆使用的OpenAI兼容适配器，统一普通/流式生成结果
-#数据流：当前设置+消息+参数→ SDK/ChatClientPort → GenerationResult；工具先聚合校验后交给图
-#配置惰性解析，客户端按地址/密钥缓存；注入替身不归本对象管理
-#"""
 """
 manager/ModelManager推理模块管理器
 OpenAI兼容客户端按当前生效设置惰性构造并缓存；改设置后下一个请求即生效，无需重启
@@ -10,6 +5,13 @@ OpenAI兼容客户端按当前生效设置惰性构造并缓存；改设置后�
 （agent_framework OpenAICompatibleChatClient，错误归一为ModelClientError）；
 注入替身与流式路径保持SDK形状不变
 """
+
+"""
+架构作用：图节点与长记忆使用的OpenAI兼容适配器，统一普通/流式生成结果
+数据流：当前设置+消息+参数→ SDK/ChatClientPort → GenerationResult；工具先聚合校验后交给图
+配置惰性解析，客户端按地址/密钥缓存；注入替身不归本对象管理
+"""
+
 import asyncio
 import json
 import re
@@ -28,10 +30,10 @@ class EmptyModelResponseError(RuntimeError):
     """模型响应没有任何候选，属于可读业务错误而不是底层IndexError。"""
 
 
-#"""
-#先拒绝截断，再检查名称字符/注册表及对象参数；此处不是完整工具参数schema校验
-#全部调用校验完成之前不得执行，避免不完整JSON或半个函数名触发副作用
-#"""
+"""
+先拒绝截断，再检查名称字符/注册表及对象参数；此处不是完整工具参数schema校验
+全部调用校验完成之前不得执行，避免不完整JSON或半个函数名触发副作用
+"""
 def validate_tool_calls(tool_calls, *, truncated=False, allowed_names=None):
     if tool_calls and truncated:
         raise InvalidToolCallError("模型输出已截断，禁止执行工具调用")
@@ -103,9 +105,9 @@ class ModelManager:
             return {}
         return load_llm_settings().require_api_key()
 
-    #"""
-    #外部client原样复用；自持client的配置键变化时新建，下一轮立即生效
-    #"""
+    """
+    外部client原样复用；自持client的配置键变化时新建，下一轮立即生效
+    """
     def _client(self, resolved):
         """按(base_url, api_key)惰性构造并缓存客户端；外部注入的client直接沿用。"""
         client = getattr(self, "client", None)
@@ -148,14 +150,14 @@ class ModelManager:
         self._client_key = None
         self._owned_client = False
 
-    #"""
-    #普通请求读取当前配置并记录模型元信息；拿到第一候选后转统一结果，再校验工具
-    #use_tools=False且走真实配置（resolved非空）时收敛到ChatClientPort；
-    #注入替身（resolved={}）保持SDK形状不变，测试契约不动；流式路径走SDK直连
-    #判据是「自持客户端」（外部注入替身即使monkeypatch了_load_config也走SDK形状）；
-    #端口payload只含model/messages/temperature（top_p/max_tokens按>0条件追加），
-    #端口层无SDK默认重试
-    #"""
+    """
+    普通请求读取当前配置并记录模型元信息；拿到第一候选后转统一结果，再校验工具
+    use_tools=False且走真实配置（resolved非空）时收敛到ChatClientPort；
+    注入替身（resolved={}）保持SDK形状不变，测试契约不动；流式路径走SDK直连
+    判据是「自持客户端」（外部注入替身即使monkeypatch了_load_config也走SDK形状）；
+    端口payload只含model/messages/temperature（top_p/max_tokens按>0条件追加），
+    端口层无SDK默认重试
+    """
     async def generate(self, messages, paras, use_tools=True):
         resolved = self._remember_resolved(self._load_config())
         injected = getattr(self, "client", None) is not None and not getattr(self, "_owned_client", False)
@@ -175,10 +177,10 @@ class ModelManager:
         self._validate_tools(result.tool_calls, result.truncated, use_tools)
         return result
 
-    #"""
-    #ChatClientPort非流式出口：同步complete经to_thread调用，错误由端口归一为
-    #ModelClientError（且_sanitize保证不泄api_key），直接向上抛交上层错误处理
-    #"""
+    """
+    ChatClientPort非流式出口：同步complete经to_thread调用，错误由端口归一为
+    ModelClientError（且_sanitize保证不泄api_key），直接向上抛交上层错误处理
+    """
     async def _generate_via_port(self, messages, paras, resolved):
         client = getattr(self, "_port_client", None)
         if client is None:
@@ -218,10 +220,10 @@ class ModelManager:
             finish_reason=finish_reason,
         )
 
-    #"""
-    #按index聚合碎片化工具名/参数；正文与推理增量逐事件await，向上游传递背压
-    #finally关闭单次响应流，包括异常/取消；聚合完成后才解析JSON、验证并发工具名
-    #"""
+    """
+    按index聚合碎片化工具名/参数；正文与推理增量逐事件await，向上游传递背压
+    finally关闭单次响应流，包括异常/取消；聚合完成后才解析JSON、验证并发工具名
+    """
     async def stream_generate(self, messages, paras, use_tools=True, on_event=None):
         """流式输出统一适配器：thinking/content按增量推送，tool名称一次推送。"""
         resolved = self._remember_resolved(self._load_config())

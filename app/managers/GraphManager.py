@@ -64,11 +64,11 @@ class GraphManager:
         return self.app
 
     #图节点
-    #"""
-    #决策节点读取提示词与上一轮ToolMessage；流式正文改发thinking_delta
-    #输出AIMessage工具调用及当次增量，工具是否执行由条件边决定
-    #输出截断时拒绝工具调用；打印内容仍可能包含用户派生文本，应控制生产日志
-    #"""
+    """
+    决策节点读取提示词与上一轮ToolMessage；流式正文改发thinking_delta
+    输出AIMessage工具调用及当次增量，工具是否执行由条件边决定
+    输出截断时拒绝工具调用；打印内容仍可能包含用户派生文本，应控制生产日志
+    """
     async def agent_node(self, state: AgentState):
         #### 决策步骤
         session = self.session

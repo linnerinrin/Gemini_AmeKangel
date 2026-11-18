@@ -71,9 +71,9 @@ class ChatSession:
         self.refresh(session_id)
 
 
-    #"""
-    #清空会话可见缓存但不重建管理器；RAG context未清，因此不能视作完整隔离重置
-    #"""
+    """
+    清空会话可见缓存但不重建管理器；RAG context未清，因此不能视作完整隔离重置
+    """
     def clear_session(self):
         deleted_id=self.session_id
         self.session_id = None
